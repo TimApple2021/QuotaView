@@ -140,6 +140,11 @@ struct MenuBarView: View {
         }
         
         let df = DateFormatter()
+        if dataModel.language == .english {
+            df.locale = Locale(identifier: "en_US_POSIX")
+            df.dateFormat = "MMM d 'at' HH:mm"
+            return "Expires \(df.string(from: date))"
+        }
         df.locale = Locale(identifier: "zh_CN")
         df.dateFormat = "M 月 d 日 HH:mm"
         return "\(df.string(from: date)) 到期"
@@ -148,9 +153,15 @@ struct MenuBarView: View {
     private func formatExpiresOn(_ dateStr: String) -> String {
         let parts = dateStr.components(separatedBy: "-")
         if parts.count == 3, let month = Int(parts[1]), let day = Int(parts[2]) {
+            if dataModel.language == .english {
+                let formatter = DateFormatter()
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                guard month >= 1, month <= formatter.shortMonthSymbols.count else { return "Expires \(dateStr)" }
+                return "Expires \(formatter.shortMonthSymbols[month - 1]) \(day)"
+            }
             return "\(month) 月 \(day) 日到期"
         }
-        return "\(dateStr) 到期"
+        return dataModel.tr("\(dateStr) 到期", "Expires \(dateStr)")
     }
 
     private func formatIsoTime(_ raw: String) -> String {
@@ -214,7 +225,7 @@ struct MenuBarView: View {
             .padding(.horizontal, 14).padding(.vertical, 9)
 
             if let err = dataModel.scanError {
-                Text("Error: \(err)").font(.system(size: 9)).foregroundColor(palette.red)
+                Text(dataModel.tr("错误：\(err)", "Error: \(err)")).font(.system(size: 9)).foregroundColor(palette.red)
                     .padding(.horizontal, 14).padding(.bottom, 4)
             }
 
@@ -337,7 +348,7 @@ struct MenuBarView: View {
                     let clampedPercent = max(0.0, min(100.0, item.usedPercent))
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text(dataModel.quotaLabel(item.name))
+                            Text(dataModel.quotaLabel(item))
                                 .font(.system(size: 10, weight: .medium))
                                 .foregroundColor(palette.primaryText)
                             Spacer()
@@ -411,7 +422,7 @@ struct MenuBarView: View {
                             } else {
                                 ForEach(availableItems) { item in
                                     HStack {
-                                        Text(item.displayName)
+                                        Text(dataModel.tr(item.displayName == "Full reset" ? "完整重置" : item.displayName, item.displayName))
                                             .font(.system(size: 9))
                                             .foregroundColor(palette.secondaryText)
                                         Spacer()

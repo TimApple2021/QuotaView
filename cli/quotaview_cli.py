@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 
 SCHEMA_VERSION = 1
-CLI_VERSION = "1.0.1"
+CLI_VERSION = "1.0.2"
 APP_PATH = Path("/Applications/QuotaView.app")
 BUNDLE_BACKEND = APP_PATH / "Contents/Resources/monitor_backend.py"
 BUNDLE_CLI = APP_PATH / "Contents/Resources/quotaview_cli.py"
@@ -97,8 +97,11 @@ def quota_data(source, dashboard):
         for item in status.get("items", []) if isinstance(status, dict) else []:
             if not isinstance(item, dict) or item.get("confidence") != "official_live":
                 continue
-            items.append({key: item.get(key) for key in ("name", "group", "window", "raw_percent", "used_percent", "percent_semantics", "reset_time", "observed_at", "source_path", "original_field_name")})
+            items.append({key: item.get(key) for key in ("name", "group", "window", "raw_percent", "used_percent", "percent_semantics", "reset_time", "observed_at", "source_path", "original_field_name", "plan_type", "plan_display_name", "plan_source", "plan_confidence") if key in item})
         result[name] = {"status": status.get("status", "unavailable"), "message": status.get("message", ""), "items": items}
+        for key in ("plan_type", "plan_display_name", "plan_source", "plan_confidence", "plan_mismatch"):
+            if key in status:
+                result[name][key] = status[key]
     return result
 
 

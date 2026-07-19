@@ -423,7 +423,12 @@ class TokenDataModel: ObservableObject {
         }
     }
 
-    func quotaLabel(_ name: String) -> String {
+    func quotaLabel(_ item: QuotaItem) -> String {
+        if item.group.hasPrefix("chatgpt_") && item.window == "weekly" {
+            let known = item.planType != "unknown" && item.planDisplayName != "Unknown"
+            return known ? tr("ChatGPT \(item.planDisplayName) 周额度", "ChatGPT \(item.planDisplayName) Weekly Quota") : tr("Codex 周额度", "Codex Weekly Quota")
+        }
+        let name = item.name
         switch name {
         case "Gemini 周额度": return tr(name, "Gemini Weekly Quota")
         case "Gemini 五小时额度": return tr(name, "Gemini 5-Hour Quota")

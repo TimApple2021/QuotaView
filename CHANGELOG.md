@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2] - 2026-07-19
+
+- Read Codex plan type from the official local `account/rateLimits/read` response.
+- Use a local observed plan only as an explicitly labelled fallback; never guess Plus.
+- Localize Codex plan titles, reset names, dates, and error labels in English and Chinese.
+- Keep CLI schema version 1 while exposing non-sensitive plan metadata.
+
 ## [1.0.1] - 2026-07-19
 
 - Added Chinese / English language selection in Settings.

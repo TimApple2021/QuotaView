@@ -181,7 +181,29 @@ os.makedirs(DATA_DIR, exist_ok=True)
 
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 CACHE_FILE = os.path.join(DATA_DIR, "codex_scan_cache.json")
-LAST_SCAN_METADATA = {"codex_calls": [], "codex_auth_info": {"auth_mode": "Unknown", "plan_type": "unknown_plan"}, "scanner_stats": {}}
+LAST_SCAN_METADATA = {"codex_calls": [], "codex_auth_info": {"auth_mode": "Unknown", "plan_type": "unknown"}, "scanner_stats": {}}
+
+CODEX_PLAN_DISPLAY_NAMES = {
+    "free": "Free", "go": "Go", "plus": "Plus", "pro": "Pro",
+    "business": "Business", "team": "Team", "enterprise": "Enterprise",
+    "edu": "Edu", "education": "Edu",
+}
+
+def normalize_codex_plan_type(value):
+    """Normalize a non-sensitive provider plan label without guessing."""
+    raw = str(value or "").strip().lower().replace("-", "_")
+    if raw in CODEX_PLAN_DISPLAY_NAMES:
+        return "edu" if raw == "education" else raw
+    return "unknown"
+
+def codex_plan_metadata(value, source, confidence):
+    plan_type = normalize_codex_plan_type(value)
+    return {
+        "plan_type": plan_type,
+        "plan_display_name": CODEX_PLAN_DISPLAY_NAMES.get(plan_type, "Unknown"),
+        "plan_source": source,
+        "plan_confidence": confidence,
+    }
 SCAN_LOCK_FILE = os.path.join(DATA_DIR, "scan.lock")
 
 
@@ -924,7 +946,7 @@ def parse_transcript_file(file_path: str, system_prompt_tokens: int, pricing_sch
 
 def get_codex_auth_info():
     """Return non-sensitive login status only; never inspect credential files."""
-    result = {"auth_mode": "Unknown", "plan_type": "unknown_plan"}
+    result = {"auth_mode": "Unknown", **codex_plan_metadata(None, "none", "unavailable")}
     try:
         proc = subprocess.run(["codex", "login", "status"], capture_output=True,
                               text=True, timeout=10, check=False)
@@ -1057,9 +1079,12 @@ def scan_codex_conversations(settings, cache):
             "session_id": session_id,
             "line_number": line_no}
     cache["processed_event_ids"] = sorted(seen_ids)
-    auth_info["plan_type"] = plan_types[-1] if plan_types else "unknown_plan"
-    if str(auth_info["plan_type"]).lower() == "plus":
-        auth_info["plan_type"] = "Plus"
+    local_plan = codex_plan_metadata(
+        plan_types[-1] if plan_types else None,
+        "codex_local_event" if plan_types else "none",
+        "local_observed" if plan_types else "unavailable",
+    )
+    auth_info.update(local_plan)
     stats["duplicate_active_archived"] = max(0, stats["duplicate_snapshots"])
     return all_calls, auth_info, stats
 
@@ -1808,6 +1833,7 @@ def normalize_codex_app_server_rate_limits(result: dict, observed_at: str) -> di
         return {
             "status": "unavailable",
             "message": "暂时无法读取当前官方额度",
+            **codex_plan_metadata(None, "none", "unavailable"),
             "items": [],
             "reset_entitlements": {
                 "status": "unavailable",
@@ -1818,7 +1844,7 @@ def normalize_codex_app_server_rate_limits(result: dict, observed_at: str) -> di
         }
 
     # 1. Parse rate limits
-    rate_limits_dict = {"status": "unavailable", "message": "暂时无法读取当前官方额度", "items": []}
+    rate_limits_dict = {"status": "unavailable", "message": "暂时无法读取当前官方额度", "items": [], **codex_plan_metadata(None, "none", "unavailable")}
     by_id = result.get("rateLimitsByLimitId")
     snapshot = by_id.get("codex") if isinstance(by_id, dict) else None
     field_prefix = "rateLimitsByLimitId.codex"
@@ -1843,17 +1869,19 @@ def normalize_codex_app_server_rate_limits(result: dict, observed_at: str) -> di
             if used_percent is not None and isinstance(resets_at, int) and resets_at > 0:
                 try:
                     reset_time = datetime.fromtimestamp(resets_at, timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
-                    plan_type = snapshot.get("planType")
-                    group = "chatgpt_plus" if plan_type == "plus" else f"chatgpt_{plan_type or 'unknown'}"
-                    display_plan = "Plus" if plan_type == "plus" else str(plan_type or "Unknown").replace("_", " ").title()
+                    plan = codex_plan_metadata(snapshot.get("planType"), "codex_app_server_rpc", "official_live")
+                    group = f"chatgpt_{plan['plan_type']}" if plan["plan_type"] != "unknown" else "chatgpt_unknown"
+                    title = f"ChatGPT {plan['plan_display_name']} 周额度" if plan["plan_type"] != "unknown" else "Codex 周额度"
                     rate_limits_dict = {
                         "status": "official_live",
                         "message": "",
+                        **plan,
                         "items": [{
                             "source": "codex",
-                            "name": f"ChatGPT {display_plan} 周额度",
+                            "name": title,
                             "group": group,
                             "window": "weekly",
+                            **plan,
                             "raw_percent": float(raw_percent),
                             "used_percent": used_percent,
                             "percent_semantics": "used",
@@ -1882,6 +1910,7 @@ def normalize_codex_app_server_rate_limits(result: dict, observed_at: str) -> di
     return {
         "status": rate_limits_dict["status"],
         "message": rate_limits_dict["message"],
+        **{key: rate_limits_dict[key] for key in ("plan_type", "plan_display_name", "plan_source", "plan_confidence")},
         "items": rate_limits_dict["items"],
         "reset_entitlements": reset_ent
     }
@@ -1970,7 +1999,35 @@ def read_codex_app_server_quota(timeout_seconds: float = 8.0) -> dict:
     return unavailable
 
 
-def get_quota_status(convos, codex_calls):
+def _apply_codex_plan_metadata(status: dict, local_auth_info=None) -> dict:
+    """Prefer official RPC planType, then local observed event metadata."""
+    if not isinstance(status, dict):
+        return status
+    items = status.get("items") if isinstance(status.get("items"), list) else []
+    official_type = normalize_codex_plan_type(status.get("plan_type"))
+    local_type = normalize_codex_plan_type((local_auth_info or {}).get("plan_type"))
+    if official_type != "unknown":
+        if local_type != "unknown" and local_type != official_type:
+            status["plan_mismatch"] = {
+                "official_plan_type": official_type,
+                "local_plan_type": local_type,
+                "official_source": "codex_app_server_rpc",
+                "local_source": "codex_local_event",
+            }
+        return status
+    if local_type != "unknown":
+        plan = codex_plan_metadata(local_type, "codex_local_event", "local_observed")
+        status.update(plan)
+        for item in items:
+            item.update(plan)
+            item["name"] = f"ChatGPT {plan['plan_display_name']} 周额度"
+            item["group"] = f"chatgpt_{plan['plan_type']}"
+    else:
+        status.update(codex_plan_metadata(None, "none", "unavailable"))
+    return status
+
+
+def get_quota_status(convos, codex_calls, local_auth_info=None):
     """
     Returns verified official live quota data.
     Only items with confidence == "official_live" are returned.
@@ -2001,6 +2058,7 @@ def get_quota_status(convos, codex_calls):
         qstatus["codex"] = read_codex_app_server_quota()
     except:
         pass
+    qstatus["codex"] = _apply_codex_plan_metadata(qstatus["codex"], local_auth_info)
         
     return qstatus
 
@@ -2017,9 +2075,9 @@ def _get_aggregated_stats_unlocked():
         convos, scanner_stats = scan_result
         if isinstance(scanner_stats, dict) and "codex" in scanner_stats:
             codex_calls = LAST_SCAN_METADATA.get("codex_calls", [])
-            codex_auth_info = LAST_SCAN_METADATA.get("codex_auth_info", {"auth_mode": "Unknown", "plan_type": "unknown_plan"})
+            codex_auth_info = LAST_SCAN_METADATA.get("codex_auth_info", {"auth_mode": "Unknown", "plan_type": "unknown"})
         else:
-            codex_calls, codex_auth_info = [], {"auth_mode": "Unknown", "plan_type": "unknown_plan"}
+            codex_calls, codex_auth_info = [], {"auth_mode": "Unknown", **codex_plan_metadata(None, "none", "unavailable")}
     else:
         convos, codex_calls, codex_auth_info, scanner_stats = scan_result
     settings = load_settings()
@@ -2485,7 +2543,7 @@ def _get_aggregated_stats_unlocked():
         "codex_auth_info": codex_auth_info,
         "scanner_stats":  scanner_stats,
         "quota_events":   scan_quota_events(),
-        "quota_status":   get_quota_status(convos, codex_calls),
+        "quota_status":   get_quota_status(convos, codex_calls, codex_auth_info),
         "pricing_tier":   settings.get("pricing_tier", "standard"),
     }
 
@@ -2493,11 +2551,13 @@ def _get_aggregated_stats_unlocked():
     # volatile scan timestamp/duration are still refreshed whenever statistics
     # actually change.
     previous_dashboard = _safe_load_json(os.path.join(DATA_DIR, "dashboard.json"), {})
-    if codex_auth_info.get("plan_type") == "unknown_plan":
-        previous_auth = previous_dashboard.get("codex_auth_info", {})
-        if previous_auth.get("plan_type") not in (None, "unknown_plan"):
-            codex_auth_info = dict(previous_auth)
-            result["codex_auth_info"] = codex_auth_info
+    # Never resurrect a historical plan label when the current official/local
+    # readers have no plan value. This avoids guessing Plus from old dashboards.
+    codex_quota = result["quota_status"].get("codex", {})
+    if codex_quota.get("plan_confidence") in {"official_live", "local_observed"}:
+        codex_auth_info = dict(codex_auth_info)
+        codex_auth_info.update({key: codex_quota.get(key) for key in ("plan_type", "plan_display_name", "plan_source", "plan_confidence")})
+        result["codex_auth_info"] = codex_auth_info
     # A successful scan always receives a fresh valid ISO timestamp. The
     # aggregated ranges remain independent of today's range.
 

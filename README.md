@@ -2,7 +2,7 @@
 
 ## English
 
-QuotaView is a native macOS menu bar app for local, read-only monitoring of Antigravity and Codex.
+QuotaView is a native macOS menu bar app for local, read-only monitoring of Antigravity and Codex. The latest release is **v1.0.2**.
 
 Features:
 
@@ -15,7 +15,9 @@ Features:
 - light, dark, and system appearance modes;
 - the read-only `quotaview` CLI.
 
-All data stays on the Mac. QuotaView does not upload account data, send telemetry, write to official client endpoints, or reset, redeem, consume, or modify quota entitlements.
+QuotaView stores its own history and settings locally and does not send telemetry or account data to a developer-operated server. Official clients may communicate with their own services normally. QuotaView does not write to official client endpoints, or reset, redeem, consume, or modify quota entitlements.
+
+Codex plan names are read from the installed official client's local `account/rateLimits/read` response, specifically `rateLimitsByLimitId.codex.planType`. QuotaView does not infer a plan from percentages or usage. If the official response has no plan type, a locally observed token event may be shown with a lower-confidence label; otherwise the plan remains unknown.
 
 ### Install
 
@@ -31,6 +33,8 @@ ln -sf "/Applications/QuotaView.app/Contents/Resources/quotaview_cli.py" "$HOME/
 export PATH="$HOME/.local/bin:$PATH"
 quotaview status --json
 ```
+
+The `PATH` change must be persisted by the user in their shell configuration (for example `~/.zshrc`) if the command should be available in future terminal sessions.
 
 ### Development
 
@@ -59,7 +63,9 @@ QuotaView 是一款原生 macOS 菜单栏应用，用于本地、只读监控 An
 - 浅色、深色和跟随系统主题；
 - 只读 CLI：`quotaview`。
 
-所有数据都保存在本机。QuotaView 不上传账户数据、不发送遥测、不写回官方客户端接口，也不执行额度 reset、redeem、consume 或修改操作。
+QuotaView 将自身历史和设置保存在本机，不向开发者运营的服务器发送遥测或账户数据。官方客户端仍可能正常连接其自身服务。QuotaView 不写回官方客户端接口，也不执行额度 reset、redeem、consume 或修改操作。
+
+Codex 套餐名称来自已安装官方客户端本地 `account/rateLimits/read` 响应中的 `rateLimitsByLimitId.codex.planType`。QuotaView 不根据额度百分比或用量猜测套餐。若官方响应缺少套餐字段，可显示带有较低置信度的本地 token 事件观察值；两者都没有时保持未知。
 
 ### 安装
 
@@ -75,6 +81,8 @@ ln -sf "/Applications/QuotaView.app/Contents/Resources/quotaview_cli.py" "$HOME/
 export PATH="$HOME/.local/bin:$PATH"
 quotaview status --json
 ```
+
+如果希望以后每次打开终端都能使用 `quotaview`，需要用户自行将 `~/.local/bin` 持久加入 shell 配置（例如 `~/.zshrc`）。
 
 ### 开发与限制
 

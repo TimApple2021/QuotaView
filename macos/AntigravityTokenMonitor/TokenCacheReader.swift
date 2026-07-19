@@ -189,6 +189,12 @@ struct LossyQuotaStatusMap: Codable {
 
 struct QuotaItem: Codable, Identifiable, Hashable {
     let name: String
+    let group: String
+    let window: String
+    let planType: String
+    let planDisplayName: String
+    let planSource: String
+    let planConfidence: String
     let usedPercent: Double
     let resetTime: String
     let isExpired: Bool?
@@ -199,6 +205,10 @@ struct QuotaItem: Codable, Identifiable, Hashable {
     enum CodingKeys: String, CodingKey {
         case name
         case group, window
+        case planType = "plan_type"
+        case planDisplayName = "plan_display_name"
+        case planSource = "plan_source"
+        case planConfidence = "plan_confidence"
         case usedPercent = "used_percent"
         case resetTime = "reset_time"
         case isExpired = "is_expired"
@@ -207,9 +217,19 @@ struct QuotaItem: Codable, Identifiable, Hashable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        let group = (try? c.decode(String.self, forKey: .group)) ?? "官方额度"
-        let window = (try? c.decode(String.self, forKey: .window)) ?? ""
-        name = (try? c.decode(String.self, forKey: .name)) ?? ([group, window].filter { !$0.isEmpty }.joined(separator: " "))
+        let encodedGroup = (try? c.decode(String.self, forKey: .group)) ?? ""
+        let encodedWindow = (try? c.decode(String.self, forKey: .window)) ?? ""
+        let rawName = (try? c.decode(String.self, forKey: .name)) ?? ([encodedGroup, encodedWindow].filter { !$0.isEmpty }.joined(separator: " "))
+        name = rawName
+        let legacyType: String = rawName.contains("Plus") ? "plus" : rawName.contains("Pro") ? "pro" : rawName.contains("Free") ? "free" : "unknown"
+        let legacyDisplay: String = legacyType == "unknown" ? "Unknown" : legacyType.capitalized
+        let legacyCodex = rawName.contains("ChatGPT") || rawName.contains("Codex")
+        group = encodedGroup.isEmpty && legacyCodex ? "chatgpt_\(legacyType)" : (encodedGroup.isEmpty ? "官方额度" : encodedGroup)
+        window = encodedWindow.isEmpty && legacyCodex && rawName.contains("周额度") ? "weekly" : encodedWindow
+        planType = (try? c.decode(String.self, forKey: .planType)) ?? legacyType
+        planDisplayName = (try? c.decode(String.self, forKey: .planDisplayName)) ?? legacyDisplay
+        planSource = (try? c.decode(String.self, forKey: .planSource)) ?? (rawName.isEmpty ? "none" : "legacy_dashboard")
+        planConfidence = (try? c.decode(String.self, forKey: .planConfidence)) ?? "legacy_observed"
         usedPercent = (try? c.decode(Double.self, forKey: .usedPercent)) ?? 0
         resetTime = (try? c.decode(String.self, forKey: .resetTime)) ?? ""
         isExpired = try? c.decode(Bool.self, forKey: .isExpired)
@@ -219,6 +239,12 @@ struct QuotaItem: Codable, Identifiable, Hashable {
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(name, forKey: .name)
+        try c.encode(group, forKey: .group)
+        try c.encode(window, forKey: .window)
+        try c.encode(planType, forKey: .planType)
+        try c.encode(planDisplayName, forKey: .planDisplayName)
+        try c.encode(planSource, forKey: .planSource)
+        try c.encode(planConfidence, forKey: .planConfidence)
         try c.encode(usedPercent, forKey: .usedPercent)
         try c.encode(resetTime, forKey: .resetTime)
         try c.encodeIfPresent(isExpired, forKey: .isExpired)
