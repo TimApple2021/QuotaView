@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.0] - 2026-07-19
+
+- Added a mutually exclusive Displayed Sources setting for both sources, Antigravity only, or Codex only.
+- Added bilingual About This Project documentation.
+- Kept scanning, token accounting, costs, quotas, prices, reset entitlements, and CLI schema unchanged.
+
 ## [1.0.2] - 2026-07-19
 
 - Read Codex plan type from the official local `account/rateLimits/read` response.

@@ -234,12 +234,14 @@ struct MenuBarView: View {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 0) {
                     // AI Tool selector
-                    VStack(spacing: 6) {
-                        sourceSegmentedControl
+                    if dataModel.shouldShowSourceSegment {
+                        VStack(spacing: 6) {
+                            sourceSegmentedControl
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.top, 10)
+                        .padding(.bottom, 6)
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.top, 10)
-                    .padding(.bottom, 6)
 
                     // Stat cards
                     let s = dataModel.filteredStats
@@ -741,6 +743,14 @@ struct MenuBarView: View {
                             }.pickerStyle(.menu).labelsHidden().frame(maxWidth: 140)
                         }
                         Divider()
+                        settingRow(dataModel.tr("显示来源", "Displayed Sources")) {
+                            Picker("", selection: $dataModel.displayedSources) {
+                                ForEach(DisplayedSources.allCases) { value in
+                                    Text(dataModel.displayedSourcesLabel(value)).tag(value)
+                                }
+                            }.pickerStyle(.menu).labelsHidden().frame(maxWidth: 140)
+                        }
+                        Divider()
                         settingRow(dataModel.tr("主页面默认范围", "Main Page Default Range")) {
                             Picker("", selection: $dataModel.selectedRange) {
                                 ForEach(TimeRange.allCases) { Text(dataModel.timeRangeLabel($0)).tag($0) }
@@ -1011,6 +1021,7 @@ struct MenuBarView: View {
 
     private func resetDefaults() {
         dataModel.menuBarDisplay  = .days7Total
+        dataModel.displayedSources = .both
         dataModel.selectedRange   = .days7
         dataModel.refreshInterval = .min5
         dataModel.theme           = .system

@@ -73,6 +73,14 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+enum DisplayedSources: String, CaseIterable, Identifiable {
+    case both
+    case antigravityOnly
+    case codexOnly
+
+    var id: String { rawValue }
+}
+
 // MARK: - TokenDataModel
 
 struct ModelFilterOption: Identifiable, Hashable {
@@ -132,6 +140,7 @@ struct SettingsConfig: Codable {
     var modelPrices: [String: ModelPriceDetail]
     var pricingTier: String?
     var theme: String?
+    var displayedSources: String?
 
     enum CodingKeys: String, CodingKey {
         case appDataDirs = "app_data_dirs"
@@ -139,6 +148,7 @@ struct SettingsConfig: Codable {
         case modelPrices = "model_prices"
         case pricingTier = "pricing_tier"
         case theme
+        case displayedSources = "displayed_sources"
     }
 }
 
@@ -364,6 +374,14 @@ class TokenDataModel: ObservableObject {
     @Published var menuBarDisplay: MenuBarDisplay = .days7Total {
         didSet { UserDefaults.standard.set(menuBarDisplay.rawValue, forKey: "menuBarDisplay3"); updateMenuBarText(); persistSettingsIfReady() }
     }
+    @Published var displayedSources: DisplayedSources = .both {
+        didSet {
+            UserDefaults.standard.set(displayedSources.rawValue, forKey: "displayedSources")
+            enforceDisplayedSourceSelection()
+            updateMenuBarText()
+            persistSettingsIfReady()
+        }
+    }
     @Published var refreshInterval: RefreshInterval = .min5 {
         didSet { UserDefaults.standard.set(refreshInterval.rawValue, forKey: "refreshInterval"); setupTimer(); persistSettingsIfReady() }
     }
@@ -408,6 +426,26 @@ class TokenDataModel: ObservableObject {
         case .days30Total: return tr("30 日可识别", "30-Day Identifiable")
         case .allTotal: return tr("累计可识别", "All-Time Identifiable")
         case .allCost: return tr("累计费用", "All-Time Cost")
+        }
+    }
+
+    func displayedSourcesLabel(_ value: DisplayedSources) -> String {
+        switch value {
+        case .both: return tr("Antigravity 与 Codex", "Antigravity & Codex")
+        case .antigravityOnly: return tr("仅 Antigravity", "Antigravity Only")
+        case .codexOnly: return tr("仅 Codex", "Codex Only")
+        }
+    }
+
+    var shouldShowSourceSegment: Bool { displayedSources == .both }
+
+    private func enforceDisplayedSourceSelection() {
+        switch displayedSources {
+        case .both: break
+        case .antigravityOnly:
+            if selectedSource != .antigravity { selectedSource = .antigravity }
+        case .codexOnly:
+            if selectedSource != .codex { selectedSource = .codex }
         }
     }
 
@@ -806,6 +844,7 @@ class TokenDataModel: ObservableObject {
         if let v = ud.string(forKey: "theme"),
            let m = AppTheme(rawValue: v) { theme = m }
         if let v = ud.string(forKey: "language"), let l = AppLanguage(rawValue: v) { language = l }
+        if let v = ud.string(forKey: "displayedSources"), let s = DisplayedSources(rawValue: v) { displayedSources = s }
         scanOnStartup = ud.bool(forKey: "scanOnStartup")
         launchAtLogin = ud.bool(forKey: "launchAtLogin")
 
@@ -821,6 +860,10 @@ class TokenDataModel: ObservableObject {
             if let savedTheme = config.theme, let decodedTheme = AppTheme(rawValue: savedTheme) {
                 self.theme = decodedTheme
             }
+            if let savedSources = config.displayedSources, let decodedSources = DisplayedSources(rawValue: savedSources) {
+                self.displayedSources = decodedSources
+            }
+            enforceDisplayedSourceSelection()
         } catch {
             print("读取 settings.json 失败: \(error)")
         }
@@ -834,7 +877,7 @@ class TokenDataModel: ObservableObject {
             dirs = ["\(NSHomeDirectory())/.gemini/antigravity", "\(NSHomeDirectory())/.gemini/antigravity-cli"]
         }
         
-        let config = SettingsConfig(appDataDirs: dirs, systemPromptTokens: systemPromptTokens, modelPrices: modelPrices, pricingTier: pricingTier == "priority" ? "priority" : "standard", theme: theme.rawValue)
+        let config = SettingsConfig(appDataDirs: dirs, systemPromptTokens: systemPromptTokens, modelPrices: modelPrices, pricingTier: pricingTier == "priority" ? "priority" : "standard", theme: theme.rawValue, displayedSources: displayedSources.rawValue)
         do {
             let encoder = JSONEncoder()
             encoder.outputFormatting = .prettyPrinted

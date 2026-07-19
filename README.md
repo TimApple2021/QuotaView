@@ -2,7 +2,7 @@
 
 ## English
 
-QuotaView is a native macOS menu bar app for local, read-only monitoring of Antigravity and Codex. The latest release is **v1.0.2**.
+QuotaView is a native macOS menu bar app for local, read-only monitoring of Antigravity and Codex. The latest release is **v1.1.0**.
 
 Features:
 
@@ -14,6 +14,7 @@ Features:
 - Chinese and English UI selectable in Settings;
 - light, dark, and system appearance modes;
 - the read-only `quotaview` CLI.
+- configurable display of both sources, Antigravity only, or Codex only;
 
 QuotaView stores its own history and settings locally and does not send telemetry or account data to a developer-operated server. Official clients may communicate with their own services normally. QuotaView does not write to official client endpoints, or reset, redeem, consume, or modify quota entitlements.
 
@@ -46,11 +47,17 @@ swiftc -typecheck macos/AntigravityTokenMonitor/*.swift
 
 Known limitations: the app depends on locally installed and signed-in official clients; upstream local formats/RPC methods may change; local history is not an official account-wide total; API-equivalent cost is not an official invoice. No private screenshots are included.
 
+### About This Project
+
+QuotaView was originally created to meet my own local monitoring needs and is maintained as a personal open-source project. Bug reports and practical suggestions are welcome through [GitHub Issues](../../issues).
+
+Because Antigravity and Codex are upstream products, changes to their local data formats or RPC interfaces may affect compatibility.
+
 See [PRIVACY.md](PRIVACY.md), [SECURITY.md](SECURITY.md), and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## 中文
 
-QuotaView 是一款原生 macOS 菜单栏应用，用于本地、只读监控 Antigravity 和 Codex。
+QuotaView 是一款原生 macOS 菜单栏应用，用于本地、只读监控 Antigravity 和 Codex。当前最新版本为 **v1.1.0**。
 
 功能包括：
 
@@ -62,6 +69,7 @@ QuotaView 是一款原生 macOS 菜单栏应用，用于本地、只读监控 An
 - 设置页可选择中文或 English；
 - 浅色、深色和跟随系统主题；
 - 只读 CLI：`quotaview`。
+- 可选择同时显示两个来源，或仅显示 Antigravity / Codex；
 
 QuotaView 将自身历史和设置保存在本机，不向开发者运营的服务器发送遥测或账户数据。官方客户端仍可能正常连接其自身服务。QuotaView 不写回官方客户端接口，也不执行额度 reset、redeem、consume 或修改操作。
 
@@ -93,5 +101,11 @@ swiftc -typecheck macos/AntigravityTokenMonitor/*.swift
 ```
 
 已知限制：依赖本机安装并登录官方客户端；上游本地格式或 RPC 方法变化可能导致读取失效；本地累计不等于官方账户累计；API 等价成本不是官方账单。仓库不提交包含私人数据的截图。
+
+### 关于本项目
+
+QuotaView 最初是根据我自己的本地监控需求开发的，目前作为个人开源项目维护。如果你在使用中遇到 Bug，或有实用的改进建议，欢迎通过 [GitHub Issues](../../issues) 反馈。
+
+由于 Antigravity 和 Codex 属于上游产品，其本地数据格式或 RPC 接口发生变化时，可能影响部分功能的兼容性。
 
 详见 [隐私政策](PRIVACY.md)、[安全说明](SECURITY.md) 和 [贡献指南](CONTRIBUTING.md)。
