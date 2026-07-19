@@ -209,7 +209,7 @@ struct MenuBarView: View {
                         .foregroundColor(palette.secondaryText)
                 }
                 .buttonStyle(.plain)
-                .help("退出 QuotaView")
+                .help(dataModel.tr("退出 QuotaView", "Quit QuotaView"))
             }
             .padding(.horizontal, 14).padding(.vertical, 9)
 
@@ -233,16 +233,16 @@ struct MenuBarView: View {
                     // Stat cards
                     let s = dataModel.filteredStats
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
-                        statCard("模型输入",   value: dataModel.fmt(s.userInputTokens))
-                        statCard("模型输出",   value: dataModel.fmt(s.outputTokens))
-                        statCard("可识别总量", value: dataModel.fmt(s.identifiableTokens))
+                        statCard(dataModel.tr("模型输入", "Input Tokens"), value: dataModel.fmt(s.userInputTokens))
+                        statCard(dataModel.tr("模型输出", "Output Tokens"), value: dataModel.fmt(s.outputTokens))
+                        statCard(dataModel.tr("可识别总量", "Identifiable"), value: dataModel.fmt(s.identifiableTokens))
                     }
                     .padding(.horizontal, 14)
                     .padding(.top, 8)
 
                     // Secondary API equivalent cost
                     HStack {
-                        Text("标准 API 等价成本")
+                        Text(dataModel.tr("标准 API 等价成本", "Standard API Equivalent Cost"))
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(palette.secondaryText)
                         Spacer()
@@ -253,7 +253,7 @@ struct MenuBarView: View {
                     .padding(.horizontal, 14)
                     .padding(.top, 8)
 
-                    Text(dataModel.selectedRange.rawValue)
+                    Text(dataModel.timeRangeLabel(dataModel.selectedRange))
                         .font(.system(size: 9))
                         .foregroundColor(palette.secondaryText)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -274,7 +274,7 @@ struct MenuBarView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help(dataModel.isScanning ? "刷新中…" : "刷新")
+                .help(dataModel.isScanning ? dataModel.tr("刷新中…", "Refreshing…") : dataModel.tr("刷新", "Refresh"))
                 
                 Spacer()
                 
@@ -288,7 +288,7 @@ struct MenuBarView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help("设置")
+                .help(dataModel.tr("设置", "Settings"))
             }
             .padding(.horizontal, 14).padding(.vertical, 8)
         }
@@ -319,16 +319,16 @@ struct MenuBarView: View {
         let resetEnt = quota?.resetEntitlements
         
         return VStack(alignment: .leading, spacing: 10) {
-            Text("额度监控")
+            Text(dataModel.tr("额度监控", "Quota Monitoring"))
                 .font(.system(size: 11, weight: .bold))
                 .foregroundColor(palette.primaryText)
                 .padding(.bottom, 2)
             
             // 1. Weekly limits
             if items.isEmpty {
-                let msg = quota?.message.isEmpty == false ? quota!.message :
-                    (sourceKey == "codex" ? "暂时无法读取当前官方额度" : "暂时无法读取官方额度")
-                Text(msg)
+                let providerMessage = quota?.message.isEmpty == false ? quota!.message : nil
+                let msg = providerMessage ?? (sourceKey == "codex" ? dataModel.tr("暂时无法读取当前官方额度", "Unable to read current official quota") : dataModel.tr("暂时无法读取官方额度", "Unable to read official quota"))
+                Text(providerMessage == nil ? msg : (dataModel.language == .english ? "Official quota reader returned an unavailable status" : msg))
                     .font(.system(size: 10))
                     .foregroundColor(palette.secondaryText)
                     .padding(.vertical, 4)
@@ -337,16 +337,16 @@ struct MenuBarView: View {
                     let clampedPercent = max(0.0, min(100.0, item.usedPercent))
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text(item.name)
+                            Text(dataModel.quotaLabel(item.name))
                                 .font(.system(size: 10, weight: .medium))
                                 .foregroundColor(palette.primaryText)
                             Spacer()
                             if item.isExpired == true {
-                                Text("已用 \(Int(clampedPercent))% (额度数据可能已过期)")
+                Text(dataModel.tr("已用 \(Int(clampedPercent))% (额度数据可能已过期)", "Used \(Int(clampedPercent))% (quota may be stale)"))
                                     .font(.system(size: 10, weight: .bold).monospacedDigit())
                                     .foregroundColor(palette.secondaryText)
                             } else {
-                                Text("已用 \(Int(clampedPercent))%")
+                                Text(dataModel.tr("已用 \(Int(clampedPercent))%", "Used \(Int(clampedPercent))%"))
                                     .font(.system(size: 10, weight: .bold).monospacedDigit())
                                     .foregroundColor(palette.primaryText)
                             }
@@ -366,7 +366,7 @@ struct MenuBarView: View {
                         .padding(.vertical, 2)
                         
                         HStack {
-                            Text("重置时间:")
+                            Text(dataModel.tr("重置时间:", "Reset:"))
                             Spacer()
                             Text(formatIsoTime(item.resetTime))
                         }
@@ -390,12 +390,12 @@ struct MenuBarView: View {
                         
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
-                                Text("使用限额重置")
+                                Text(dataModel.tr("使用限额重置", "Usage Limit Resets"))
                                     .font(.system(size: 10, weight: .semibold))
                                     .foregroundColor(palette.primaryText)
                                 Spacer()
                                 
-                                Text("可用 \(count) 次")
+                                Text(dataModel.tr("可用 \(count) 次", "\(count) available"))
                                     .font(.system(size: 9, weight: .bold))
                                     .foregroundColor(palette.successText)
                                     .padding(.horizontal, 6)
@@ -404,7 +404,7 @@ struct MenuBarView: View {
                             }
                             
                             if availableItems.isEmpty {
-                                Text("暂无可用重置")
+                                Text(dataModel.tr("暂无可用重置", "No resets available"))
                                     .font(.system(size: 9))
                                     .foregroundColor(palette.secondaryText)
                                     .padding(.vertical, 2)
@@ -425,10 +425,10 @@ struct MenuBarView: View {
                         }
                     } else {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("使用限额重置")
+                            Text(dataModel.tr("使用限额重置", "Usage Limit Resets"))
                                 .font(.system(size: 10, weight: .semibold))
                                 .foregroundColor(palette.primaryText)
-                            Text("暂时无法读取可用重置")
+                            Text(dataModel.tr("暂时无法读取可用重置", "Unable to read available resets"))
                                 .font(.system(size: 9))
                                 .foregroundColor(palette.secondaryText)
                                 .padding(.vertical, 2)
@@ -436,10 +436,10 @@ struct MenuBarView: View {
                     }
                 } else {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("使用限额重置")
+                        Text(dataModel.tr("使用限额重置", "Usage Limit Resets"))
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundColor(palette.primaryText)
-                        Text("暂时无法读取可用重置")
+                        Text(dataModel.tr("暂时无法读取可用重置", "Unable to read available resets"))
                             .font(.system(size: 9))
                             .foregroundColor(palette.secondaryText)
                             .padding(.vertical, 2)
@@ -559,11 +559,11 @@ struct MenuBarView: View {
     private var trendChart: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text("趋势").font(.system(size: 9, weight: .semibold)).foregroundColor(palette.secondaryText)
+                Text(dataModel.tr("趋势", "Trend")).font(.system(size: 9, weight: .semibold)).foregroundColor(palette.secondaryText)
                 Spacer()
                 HStack(spacing: 8) {
-                    legendDot("模型输入", color: palette.blue)
-                    legendDot("模型输出", color: .purple)
+                    legendDot(dataModel.tr("模型输入", "Input"), color: palette.blue)
+                    legendDot(dataModel.tr("模型输出", "Output"), color: .purple)
                 }
             }
 
@@ -575,7 +575,7 @@ struct MenuBarView: View {
                 let pts = chartPoints()
                 let hasData = pts.contains { $0.input > 0 || $0.output > 0 }
                 if !hasData {
-                    emptyChartPlaceholder("当前时间范围暂无可统计数据")
+                    emptyChartPlaceholder(dataModel.tr("当前时间范围暂无可统计数据", "No data in the current range"))
                 } else {
                     barChart(pts: pts)
                 }
@@ -589,9 +589,9 @@ struct MenuBarView: View {
         return VStack(spacing: 6) {
             if hasAny {
                 HStack(spacing: 20) {
-                    todayStat("模型输入", value: dataModel.fmt(s.userInputTokens), color: palette.blue)
-                    todayStat("模型输出", value: dataModel.fmt(s.outputTokens),    color: .purple)
-                    todayStat("可识别",   value: dataModel.fmt(s.identifiableTokens), color: .teal)
+                    todayStat(dataModel.tr("模型输入", "Input"), value: dataModel.fmt(s.userInputTokens), color: palette.blue)
+                    todayStat(dataModel.tr("模型输出", "Output"), value: dataModel.fmt(s.outputTokens), color: .purple)
+                    todayStat(dataModel.tr("可识别", "Identifiable"), value: dataModel.fmt(s.identifiableTokens), color: .teal)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
@@ -600,7 +600,7 @@ struct MenuBarView: View {
                 .overlay(RoundedRectangle(cornerRadius: 8)
                     .stroke(palette.border, lineWidth: 1))
             } else {
-                emptyChartPlaceholder("今日暂无可统计数据")
+                emptyChartPlaceholder(dataModel.tr("今日暂无可统计数据", "No data today"))
             }
         }
     }
@@ -699,12 +699,12 @@ struct MenuBarView: View {
                 } label: {
                     HStack(spacing: 3) {
                         Image(systemName: "chevron.left").font(.system(size: 10, weight: .bold))
-                        Text("返回").font(.system(size: 11))
+                        Text(dataModel.tr("返回", "Back")).font(.system(size: 11))
                     }.foregroundColor(.accentColor)
                 }.buttonStyle(.plain)
 
                 Spacer()
-                Text("设置").font(.system(size: 12, weight: .semibold)).foregroundColor(palette.primaryText)
+                Text(dataModel.tr("设置", "Settings")).font(.system(size: 12, weight: .semibold)).foregroundColor(palette.primaryText)
                 Spacer()
             }
             .padding(.horizontal, 14).padding(.vertical, 10)
@@ -712,7 +712,7 @@ struct MenuBarView: View {
             Divider().background(palette.divider)
 
             if let settingsError = dataModel.settingsError {
-                Text("设置保存失败：\(settingsError)")
+                Text(dataModel.tr("设置保存失败：\(settingsError)", "Settings save failed: \(settingsError)"))
                     .font(.system(size: 9))
                     .foregroundColor(palette.red)
                     .padding(.horizontal, 14)
@@ -724,39 +724,46 @@ struct MenuBarView: View {
 
                     // Display & Behaviour
                     settingsGroup {
-                        settingRow("菜单栏显示") {
+                        settingRow(dataModel.tr("菜单栏显示", "Menu Bar Display")) {
                             Picker("", selection: $dataModel.menuBarDisplay) {
-                                ForEach(MenuBarDisplay.allCases) { Text($0.rawValue).tag($0) }
+                                ForEach(MenuBarDisplay.allCases) { Text(dataModel.menuBarDisplayLabel($0)).tag($0) }
                             }.pickerStyle(.menu).labelsHidden().frame(maxWidth: 140)
                         }
                         Divider()
-                        settingRow("主页面默认范围") {
+                        settingRow(dataModel.tr("主页面默认范围", "Main Page Default Range")) {
                             Picker("", selection: $dataModel.selectedRange) {
-                                ForEach(TimeRange.allCases) { Text($0.rawValue).tag($0) }
+                                ForEach(TimeRange.allCases) { Text(dataModel.timeRangeLabel($0)).tag($0) }
                             }.pickerStyle(.menu).labelsHidden().frame(maxWidth: 140)
                         }
                         Divider()
-                        settingRow("自动刷新") {
+                        settingRow(dataModel.tr("自动刷新", "Auto Refresh")) {
                             Picker("", selection: $dataModel.refreshInterval) {
-                                ForEach(RefreshInterval.allCases) { Text($0.label).tag($0) }
+                                ForEach(RefreshInterval.allCases) { Text(dataModel.refreshIntervalLabel($0)).tag($0) }
                             }.pickerStyle(.menu).labelsHidden().frame(maxWidth: 140)
                         }
                         Divider()
-                        settingRow("外观主题") {
+                        settingRow(dataModel.tr("外观主题", "Appearance")) {
                             Picker("", selection: $dataModel.theme) {
-                                ForEach(AppTheme.allCases) { Text($0.rawValue).tag($0) }
+                                ForEach(AppTheme.allCases) { Text(dataModel.themeLabel($0)).tag($0) }
+                            }.pickerStyle(.menu).labelsHidden().frame(maxWidth: 140)
+                        }
+                        Divider()
+                        settingRow(dataModel.tr("语言", "Language")) {
+                            Picker("", selection: $dataModel.language) {
+                                Text("中文").tag(AppLanguage.chinese)
+                                Text("English").tag(AppLanguage.english)
                             }.pickerStyle(.menu).labelsHidden().frame(maxWidth: 140)
                         }
                     }
 
                     // Launch
                     settingsGroup {
-                        settingRow("启动时自动扫描") {
+                        settingRow(dataModel.tr("启动时自动扫描", "Scan on Startup")) {
                             Toggle("", isOn: $dataModel.scanOnStartup)
                                 .labelsHidden().toggleStyle(.switch).controlSize(.mini)
                         }
                         Divider()
-                        settingRow("登录时自动启动") {
+                        settingRow(dataModel.tr("登录时自动启动", "Launch at Login")) {
                             Toggle("", isOn: $dataModel.launchAtLogin)
                                 .labelsHidden().toggleStyle(.switch).controlSize(.mini)
                         }
@@ -768,7 +775,7 @@ struct MenuBarView: View {
                             withAnimation { isModelPricingExpanded.toggle() }
                         } label: {
                             HStack {
-                                Text("价格配置").font(.system(size: 11, weight: .semibold)).foregroundColor(palette.primaryText)
+                                Text(dataModel.tr("价格配置", "Pricing")).font(.system(size: 11, weight: .semibold)).foregroundColor(palette.primaryText)
                                 Spacer()
                                 Image(systemName: isModelPricingExpanded ? "chevron.down" : "chevron.right")
                                     .font(.system(size: 9, weight: .bold))
@@ -783,14 +790,14 @@ struct MenuBarView: View {
                             
                             // Antigravity sub-section
                             VStack(alignment: .leading, spacing: 6) {
-                                Text("Antigravity API 等价价格")
+                                Text(dataModel.tr("Antigravity API 等价价格", "Antigravity API Equivalent Pricing"))
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(palette.secondaryText)
                                     .padding(.top, 4)
                                 
                                 let agKeys = dataModel.settingsModelKeys(for: .antigravity)
                                 if agKeys.isEmpty {
-                                    Text("尚未发现 Antigravity 模型")
+                                    Text(dataModel.tr("尚未发现 Antigravity 模型", "No Antigravity models found"))
                                         .font(.system(size: 9)).foregroundColor(palette.secondaryText)
                                         .padding(.vertical, 4)
                                 } else {
@@ -806,13 +813,13 @@ struct MenuBarView: View {
                             
                             // Codex sub-section
                             VStack(alignment: .leading, spacing: 6) {
-                                Text("Codex API 等价价格")
+                                Text(dataModel.tr("Codex API 等价价格", "Codex API Equivalent Pricing"))
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(palette.secondaryText)
                                 
                                 let codexKeys = dataModel.settingsModelKeys(for: .codex)
                                 if codexKeys.isEmpty {
-                                    Text("尚未发现 Codex 模型")
+                                    Text(dataModel.tr("尚未发现 Codex 模型", "No Codex models found"))
                                         .font(.system(size: 9)).foregroundColor(palette.secondaryText)
                                         .padding(.vertical, 4)
                                 } else {
@@ -835,7 +842,7 @@ struct MenuBarView: View {
             Divider().background(palette.divider)
             
             HStack {
-                Button("恢复默认设置", role: .destructive) { resetDefaults() }
+                Button(dataModel.tr("恢复默认设置", "Restore Defaults"), role: .destructive) { resetDefaults() }
                     .buttonStyle(.bordered).controlSize(.small)
                     .foregroundColor(palette.destructiveText)
                     .tint(palette.destructiveText)
@@ -843,7 +850,7 @@ struct MenuBarView: View {
                 
                 Spacer()
                 
-                Button("退出 QuotaView", role: .destructive) {
+                Button(dataModel.tr("退出 QuotaView", "Quit QuotaView"), role: .destructive) {
                     ScannerRunner.terminateActiveScan()
                     NSApplication.shared.terminate(nil)
                 }
@@ -866,14 +873,14 @@ struct MenuBarView: View {
             
             if detail.pricingProfile == "unpriced" {
                 if key == "gpt-oss-120b" {
-                    Text("开放权重｜无统一 API 单价")
+                        Text(dataModel.tr("开放权重｜无统一 API 单价", "Open weights | No unified API price"))
                         .font(.system(size: 9, weight: .medium))
                         .foregroundColor(palette.secondaryText)
-                    Text("运行成本取决于托管平台或本地算力")
+                    Text(dataModel.tr("运行成本取决于托管平台或本地算力", "Cost depends on hosting or local compute"))
                         .font(.system(size: 8))
                         .foregroundColor(palette.tertiaryText)
                 } else {
-                    Text("未定价")
+                    Text(dataModel.tr("未定价", "Unpriced"))
                         .font(.system(size: 9, weight: .medium))
                         .foregroundColor(palette.secondaryText)
                 }
@@ -887,7 +894,7 @@ struct MenuBarView: View {
             } else {
             HStack(spacing: 8) {
                 // Input Price
-                Text("输入:").font(.system(size: 9)).foregroundColor(palette.secondaryText)
+                Text(dataModel.tr("输入:", "Input:")).font(.system(size: 9)).foregroundColor(palette.secondaryText)
                 TextField("", value: Binding(
                     get: { detail.inputPricePerMillion },
                     set: { newVal in
@@ -911,7 +918,7 @@ struct MenuBarView: View {
                 // Cached Price (only if source is Codex)
                 if source == .codex {
                     Spacer()
-                    Text("缓存:").font(.system(size: 9)).foregroundColor(palette.secondaryText)
+                    Text(dataModel.tr("缓存:", "Cached:")).font(.system(size: 9)).foregroundColor(palette.secondaryText)
                     TextField("", value: Binding(
                         get: { detail.cachedInputPricePerMillion ?? 0.0 },
                         set: { newVal in
@@ -936,7 +943,7 @@ struct MenuBarView: View {
                 Spacer()
                 
                 // Output Price
-                Text("输出:").font(.system(size: 9)).foregroundColor(palette.secondaryText)
+                Text(dataModel.tr("输出:", "Output:")).font(.system(size: 9)).foregroundColor(palette.secondaryText)
                 TextField("", value: Binding(
                     get: { detail.outputPricePerMillion },
                     set: { newVal in

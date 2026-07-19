@@ -67,6 +67,12 @@ enum AppTheme: String, CaseIterable, Identifiable {
     }
 }
 
+enum AppLanguage: String, CaseIterable, Identifiable {
+    case chinese = "中文"
+    case english = "English"
+    var id: String { rawValue }
+}
+
 // MARK: - TokenDataModel
 
 struct ModelFilterOption: Identifiable, Hashable {
@@ -368,11 +374,64 @@ class TokenDataModel: ObservableObject {
             persistSettingsIfReady()
         }
     }
+    @Published var language: AppLanguage = .chinese {
+        didSet {
+            UserDefaults.standard.set(language.rawValue, forKey: "language")
+            persistSettingsIfReady()
+        }
+    }
     @Published var scanOnStartup: Bool = false {
         didSet { UserDefaults.standard.set(scanOnStartup, forKey: "scanOnStartup"); persistSettingsIfReady() }
     }
     @Published var launchAtLogin: Bool = false {
         didSet { UserDefaults.standard.set(launchAtLogin, forKey: "launchAtLogin"); toggleLaunchAtLogin(); persistSettingsIfReady() }
+    }
+
+    func tr(_ chinese: String, _ english: String) -> String {
+        language == .english ? english : chinese
+    }
+
+    func timeRangeLabel(_ range: TimeRange) -> String {
+        switch range {
+        case .today: return tr("今天", "Today")
+        case .days7: return tr("近 7 天", "Last 7 Days")
+        case .days30: return tr("近 30 天", "Last 30 Days")
+        case .allTime: return tr("本地累计", "Local All-Time")
+        }
+    }
+
+    func menuBarDisplayLabel(_ display: MenuBarDisplay) -> String {
+        switch display {
+        case .iconOnly: return tr("仅图标", "Icon Only")
+        case .todayTotal: return tr("今日可识别", "Today's Identifiable")
+        case .days7Total: return tr("7 日可识别", "7-Day Identifiable")
+        case .days30Total: return tr("30 日可识别", "30-Day Identifiable")
+        case .allTotal: return tr("累计可识别", "All-Time Identifiable")
+        case .allCost: return tr("累计费用", "All-Time Cost")
+        }
+    }
+
+    func refreshIntervalLabel(_ interval: RefreshInterval) -> String {
+        interval == .off ? tr("关闭", "Off") : "\(interval.rawValue) \(tr("分钟", interval.rawValue == 1 ? "minute" : "minutes"))"
+    }
+
+    func themeLabel(_ value: AppTheme) -> String {
+        switch value {
+        case .system: return tr("跟随系统", "System")
+        case .light: return tr("浅色", "Light")
+        case .dark: return tr("深色", "Dark")
+        }
+    }
+
+    func quotaLabel(_ name: String) -> String {
+        switch name {
+        case "Gemini 周额度": return tr(name, "Gemini Weekly Quota")
+        case "Gemini 五小时额度": return tr(name, "Gemini 5-Hour Quota")
+        case "Claude/GPT 周额度": return tr(name, "Claude/GPT Weekly Quota")
+        case "Claude/GPT 五小时额度": return tr(name, "Claude/GPT 5-Hour Quota")
+        case "ChatGPT Plus 周额度": return tr(name, "ChatGPT Plus Weekly Quota")
+        default: return name
+        }
     }
     @Published var logDirs: String = "\(NSHomeDirectory())/.gemini/antigravity\n\(NSHomeDirectory())/.gemini/antigravity-cli" {
         didSet { persistSettingsIfReady() }
@@ -402,7 +461,7 @@ class TokenDataModel: ObservableObject {
     // Model options for selection
     var modelOptions: [ModelFilterOption] {
         let models = currentStats.models ?? [:]
-        var options = [ModelFilterOption(id: "all", name: "全部模型")]
+        var options = [ModelFilterOption(id: "all", name: tr("全部模型", "All Models"))]
         let used = models.filter { $0.value.identifiableTokens > 0 }
         
         let sortedKeys = used.keys.sorted { lhs, rhs in
@@ -431,7 +490,7 @@ class TokenDataModel: ObservableObject {
         case "gpt-5.4": return "GPT-5.4"
         case "gpt-5.4-mini": return "GPT-5.4 Mini"
         case "codex-auto-review": return "Codex Auto Review"
-        case "missing_model": return "模型未知"
+        case "missing_model": return tr("模型未知", "Missing Model")
         default: return model
         }
     }
@@ -741,6 +800,7 @@ class TokenDataModel: ObservableObject {
            let m = RefreshInterval(rawValue: n) { refreshInterval = m }
         if let v = ud.string(forKey: "theme"),
            let m = AppTheme(rawValue: v) { theme = m }
+        if let v = ud.string(forKey: "language"), let l = AppLanguage(rawValue: v) { language = l }
         scanOnStartup = ud.bool(forKey: "scanOnStartup")
         launchAtLogin = ud.bool(forKey: "launchAtLogin")
 

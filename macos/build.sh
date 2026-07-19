@@ -6,6 +6,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MACOS_DIR="$PROJECT_DIR/macos"
 APP_NAME="QuotaView"
 EXECUTABLE_NAME="QuotaView"
+VERSION="1.0.1"
 APP_BUNDLE="$PROJECT_DIR/$APP_NAME.app"
 BIN_DIR="$APP_BUNDLE/Contents/MacOS"
 RES_DIR="$APP_BUNDLE/Contents/Resources"
@@ -45,7 +46,7 @@ swiftc -parse-as-library \
     "$MACOS_DIR/AntigravityTokenMonitor"/*.swift
 
 echo "=== 5. 写入 QuotaView Info.plist ==="
-cat << 'EOF' > "$APP_BUNDLE/Contents/Info.plist"
+cat << EOF > "$APP_BUNDLE/Contents/Info.plist"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -63,9 +64,9 @@ cat << 'EOF' > "$APP_BUNDLE/Contents/Info.plist"
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>$VERSION</string>
     <key>CFBundleVersion</key>
-    <string>100</string>
+    <string>101</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>LSUIElement</key>

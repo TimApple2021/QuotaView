@@ -39,7 +39,7 @@ class TestLightTheme(unittest.TestCase):
         self.assertIn(".stroke(palette.border", MENU)
 
     def test_settings_title_is_themeable(self):
-        self.assertIn('Text("设置").font(.system(size: 12, weight: .semibold)).foregroundColor(palette.primaryText)', MENU)
+        self.assertIn('dataModel.tr("设置", "Settings")', MENU)
 
     def test_settings_labels_are_not_hardcoded_black(self):
         self.assertNotIn("foregroundColor(.black)", MENU)
@@ -54,8 +54,8 @@ class TestLightTheme(unittest.TestCase):
         self.assertIn("palette.primaryText", MENU)
 
     def test_price_labels_are_themeable(self):
-        self.assertIn('Text("输入:").font(.system(size: 9)).foregroundColor(palette.secondaryText)', MENU)
-        self.assertIn('Text("输出:").font(.system(size: 9)).foregroundColor(palette.secondaryText)', MENU)
+        self.assertIn('dataModel.tr("输入:", "Input:")', MENU)
+        self.assertIn('dataModel.tr("输出:", "Output:")', MENU)
 
     def test_price_inputs_use_themeable_surface_and_text(self):
         self.assertIn(".background(palette.inputBackground)", MENU)

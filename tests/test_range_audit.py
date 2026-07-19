@@ -65,8 +65,8 @@ class RangeAuditTests(unittest.TestCase):
         self.assertIn('case days7   = "近 7 天"', MODEL)
         self.assertIn('case days30  = "近 30 天"', MODEL)
         self.assertIn('case allTime = "本地累计"', MODEL)
-        self.assertIn('settingRow("主页面默认范围")', VIEW)
-        self.assertIn('dataModel.selectedRange.rawValue', VIEW)
+        self.assertIn('settingRow(dataModel.tr("主页面默认范围", "Main Page Default Range"))', VIEW)
+        self.assertIn('dataModel.timeRangeLabel(dataModel.selectedRange)', VIEW)
 
     def test_legacy_range_values_migrate(self):
         self.assertIn('"7 天": .days7', MODEL)
