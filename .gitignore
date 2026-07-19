@@ -1,0 +1,43 @@
+# Runtime and private data
+data/backup/
+data/*.json
+data/*.json.bak
+data/*.lock
+data/.usage_cache.json
+.usage_cache.json
+logs/
+runtime/
+Application Support/
+
+# Python and test caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# macOS/Xcode build output
+.DS_Store
+DerivedData/
+.build/
+build/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# Local app bundles and release artifacts
+*.app/
+release/
+dist/
+*.dmg
+*.zip
+SHA256SUMS.txt
+
+# Private audit and scratch material
+scratch/
+audit_*.py
+model_audit_report.md
+test_monitor.py
+docs/audit_*.md
+docs/codex_*.md
+docs/ESTIMATION_METHOD.md
