@@ -53,6 +53,9 @@ struct QuotaViewPalette {
     let destructiveText: Color
     let destructiveBackground: Color
     let blue: Color
+    let sourceBadgeBackground: Color
+    let sourceBadgeText: Color
+    let sourceBadgeBorder: Color
     let orange: Color
     let red: Color
     let successText: Color
@@ -82,7 +85,11 @@ struct QuotaViewPalette {
         inactiveSegmentText = Color(nsColor: .secondaryLabelColor)
         destructiveText = Color(nsColor: .systemRed)
         destructiveBackground = Color(nsColor: .systemRed).opacity(light ? 0.12 : 0.22)
-        blue = Color(nsColor: .systemBlue)
+        let sourceBlue = Color(nsColor: .systemBlue)
+        blue = sourceBlue
+        sourceBadgeBackground = sourceBlue.opacity(light ? 0.10 : 0.18)
+        sourceBadgeText = light ? Color(nsColor: .secondaryLabelColor) : Color(nsColor: .labelColor)
+        sourceBadgeBorder = sourceBlue.opacity(light ? 0.15 : 0.20)
         orange = Color(nsColor: .systemOrange)
         red = Color(nsColor: .systemRed)
         successText = Color(nsColor: .systemGreen)
@@ -109,6 +116,14 @@ struct MenuBarView: View {
     }
 
     private var palette: QuotaViewPalette { QuotaViewPalette(colorScheme: effectiveColorScheme) }
+
+    private var sourceBadgeLabel: String? {
+        switch dataModel.displayedSources {
+        case .both: return nil
+        case .antigravityOnly: return "Antigravity"
+        case .codexOnly: return "Codex"
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -207,6 +222,23 @@ struct MenuBarView: View {
                     .accessibilityLabel("QuotaView")
                 Text("QuotaView").font(.system(size: 12, weight: .bold))
                     .foregroundColor(palette.primaryText)
+                if let sourceBadgeLabel {
+                    Text(sourceBadgeLabel)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(palette.sourceBadgeText)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(palette.sourceBadgeBackground)
+                                .overlay(
+                                    Capsule()
+                                        .stroke(palette.sourceBadgeBorder, lineWidth: 0.5)
+                                )
+                        )
+                        .accessibilityLabel(dataModel.tr("当前来源：\(sourceBadgeLabel)", "Current source: \(sourceBadgeLabel)"))
+                        .accessibilityAddTraits(.isStaticText)
+                }
                 Spacer()
                 Text(formattedScanTime)
                     .font(.system(size: 9)).foregroundColor(palette.secondaryText)

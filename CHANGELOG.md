@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.1] - 2026-07-19
+
+- Added a compact source badge to the title bar in single-source mode.
+- The badge identifies Antigravity or Codex without restoring the source switcher.
+- No changes to monitoring, quota, pricing, history, or CLI behavior.
+
+### v1.1.1（中文）
+
+- 单来源模式在标题栏增加轻量来源标识。
+- 在不恢复来源切换器的情况下明确显示 Antigravity 或 Codex。
+- 不涉及统计、额度、价格、历史或 CLI 行为变更。
+
 ## [1.1.0] - 2026-07-19
 
 - Added a mutually exclusive Displayed Sources setting for both sources, Antigravity only, or Codex only.

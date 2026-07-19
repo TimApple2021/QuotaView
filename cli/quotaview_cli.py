@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 
 SCHEMA_VERSION = 1
-CLI_VERSION = "1.1.0"
+CLI_VERSION = "1.1.1"
 APP_PATH = Path("/Applications/QuotaView.app")
 BUNDLE_BACKEND = APP_PATH / "Contents/Resources/monitor_backend.py"
 BUNDLE_CLI = APP_PATH / "Contents/Resources/quotaview_cli.py"

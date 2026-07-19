@@ -32,4 +32,4 @@ def test_readme_is_bilingual():
 
 
 def test_release_build_version_is_bumped():
-    assert 'VERSION="1.1.0"' in BUILD
+    assert 'VERSION="1.1.1"' in BUILD
