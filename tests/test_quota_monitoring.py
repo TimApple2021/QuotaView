@@ -95,7 +95,7 @@ class TestQuotaMonitoring(unittest.TestCase):
         ent = parsed["reset_entitlements"]
         self.assertEqual(ent["status"], "official_live")
         self.assertEqual(ent["available_count"], 2)
-        self.assertEqual(ent["count_semantics"], "official")
+        self.assertEqual(ent["count_semantics"], "normalized")
         self.assertEqual(len(ent["items"]), 2)
         
         # Check first credit expires_at format
@@ -104,7 +104,8 @@ class TestQuotaMonitoring(unittest.TestCase):
         self.assertEqual(ent["items"][0]["display_name"], "Full reset")
         self.assertEqual(ent["items"][0]["type"], "codexRateLimits")
         self.assertEqual(ent["items"][0]["status"], "available")
-        self.assertEqual(ent["items"][0]["id"], "c1")
+        self.assertEqual(len(ent["entitlements"]), 2)
+        self.assertTrue(ent["count_list_consistent"])
         self.assertEqual(ent["available_count_field_name"], "rateLimitResetCredits.availableCount")
         self.assertEqual(ent["original_field_name"], "rateLimitResetCredits.credits")
         self.assertEqual(ent["expires_at_field_name"], "rateLimitResetCredits.credits[].expiresAt")
@@ -122,9 +123,9 @@ class TestQuotaMonitoring(unittest.TestCase):
             {"id": "expired", "resetType": "codexRateLimits", "status": "expired", "title": "Full reset", "expiresAt": 1785528035},
         ]}}
         ent = m.parse_reset_entitlements(raw, "2026-07-18T15:02:35Z")
-        available = [x for x in ent["items"] if x["status"].lower() == "available"]
+        available = [x for x in ent["items"] if x["is_available"]]
         self.assertEqual(ent["available_count"], 1)
-        self.assertEqual([x["id"] for x in available], ["available"])
+        self.assertEqual(len(available), 1)
 
     def test_missing_count_derives_from_available_items(self):
         raw = {"rateLimitResetCredits": {"credits": [
@@ -133,16 +134,17 @@ class TestQuotaMonitoring(unittest.TestCase):
         ]}}
         ent = m.parse_reset_entitlements(raw, "2026-07-18T15:02:35Z")
         self.assertEqual(ent["available_count"], 1)
-        self.assertEqual(ent["count_semantics"], "derived_from_available_items")
+        self.assertEqual(ent["count_semantics"], "normalized")
 
-    def test_official_count_wins_when_item_count_differs(self):
+    def test_normalized_count_wins_when_official_count_differs(self):
         raw = {"rateLimitResetCredits": {"availableCount": 2, "credits": [
             {"id": "a", "status": "available", "title": "Full reset"},
             {"id": "b", "status": "used", "title": "Full reset"},
         ]}}
         ent = m.parse_reset_entitlements(raw, "2026-07-18T15:02:35Z")
-        self.assertEqual(ent["available_count"], 2)
-        self.assertEqual(len([x for x in ent["items"] if x["status"].lower() == "available"]), 1)
+        self.assertEqual(ent["official_available_count"], 2)
+        self.assertEqual(ent["available_count"], 1)
+        self.assertFalse(ent["count_list_consistent"])
 
     def test_antigravity_model_normalization_and_pro_tiers(self):
         self.assertEqual(m.normalize_antigravity_model("Gemini 3.1 Pro (Low)"), "gemini-3.1-pro")
@@ -193,7 +195,7 @@ class TestQuotaMonitoring(unittest.TestCase):
         parsed = m.normalize_codex_app_server_rate_limits(raw_result, "2026-07-18T15:02:35Z")
         ent = parsed["reset_entitlements"]
         self.assertEqual(ent["available_count"], 1)
-        self.assertEqual(ent["count_semantics"], "derived_from_available_items")
+        self.assertEqual(ent["count_semantics"], "normalized")
 
     def test_available_count_zero_and_unavailable(self):
         # 9. available_count = 0 正常显示。
@@ -214,7 +216,7 @@ class TestQuotaMonitoring(unittest.TestCase):
         unav = m.normalize_codex_app_server_rate_limits(None, "2026-07-18T15:02:35Z")
         self.assertEqual(unav["reset_entitlements"]["status"], "unavailable")
         self.assertEqual(len(unav["reset_entitlements"]["items"]), 0)
-        self.assertIsNone(unav["reset_entitlements"]["available_count"])
+        self.assertEqual(unav["reset_entitlements"]["available_count"], 0)
 
     def test_reset_entitlements_fault_isolation(self):
         # 14. 重置权益失败不影响 Codex 周额度。
@@ -256,7 +258,8 @@ class TestQuotaMonitoring(unittest.TestCase):
         self.assertEqual(parsed_b["status"], "unavailable")
         self.assertEqual(len(parsed_b["items"]), 0)
         self.assertEqual(parsed_b["reset_entitlements"]["status"], "official_live")
-        self.assertEqual(parsed_b["reset_entitlements"]["available_count"], 2)
+        self.assertEqual(parsed_b["reset_entitlements"]["available_count"], 1)
+        self.assertEqual(parsed_b["reset_entitlements"]["official_available_count"], 2)
 
     def test_swift_code_ui_restrictions(self):
         # 16. UI 不包含“使用重置”按钮。

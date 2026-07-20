@@ -1745,12 +1745,84 @@ def codex_used_percent(raw_percent, semantics: str):
     return raw if semantics == "used" else 100.0 - raw
 
 
+def _parse_reset_expiration(value):
+    """Parse official reset expiry values into an aware UTC datetime."""
+    if value is None or value == "":
+        return None, False
+    try:
+        if isinstance(value, (int, float)) or (isinstance(value, str) and value.strip().isdigit()):
+            numeric = float(value)
+            if numeric > 100_000_000_000:
+                numeric /= 1000.0
+            return datetime.fromtimestamp(numeric, timezone.utc), False
+        text = str(value).strip()
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
+            # An expiresOn date represents the whole local-calendar day.
+            return datetime.fromisoformat(text).replace(hour=23, minute=59, second=59, tzinfo=timezone.utc), False
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc), False
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None, True
+
+
+def _normalize_reset_credit(item: dict, now: datetime):
+    raw_status = str(item.get("status") or "").strip()
+    status = raw_status.lower()
+    explicit_available = {"available", "active", "ready", "enabled"}
+    explicit_unavailable = {"used", "consumed", "redeemed", "expired", "revoked", "cancelled", "canceled"}
+    consumed_flags = any(item.get(key) is True for key in ("consumed", "used", "redeemed", "revoked", "cancelled", "canceled"))
+    raw_expiry = item.get("expiresAt") if item.get("expiresAt") is not None else item.get("expires_at")
+    raw_expires_on = item.get("expiresOn") if item.get("expiresOn") is not None else item.get("expires_on")
+    expiry_value = raw_expiry if raw_expiry not in (None, "") else raw_expires_on
+    expiry_dt, expiration_parse_failed = _parse_reset_expiration(expiry_value)
+    expired = bool(expiry_dt and expiry_dt < now)
+    inferred = False
+    if status in explicit_available and not consumed_flags and not expired:
+        normalized_status = "available"
+        available = True
+    elif status in explicit_unavailable or consumed_flags or expired:
+        normalized_status = "expired" if expired else (status or "unavailable")
+        available = False
+    elif not raw_status and not consumed_flags and not expired:
+        normalized_status = "available"
+        available = True
+        inferred = True
+    else:
+        normalized_status = status or "unavailable"
+        available = False
+    expires_at = expiry_dt.isoformat(timespec="seconds").replace("+00:00", "Z") if expiry_dt and raw_expiry not in (None, "") else None
+    raw_expiration = str(expiry_value or "")
+    stable_material = "|".join(str(item.get(key) or "") for key in ("id", "resetType", "title", "grantedAt", "expiresAt", "expiresOn"))
+    stable_key = hashlib.sha256(stable_material.encode("utf-8")).hexdigest()[:24]
+    return {
+        "id": stable_key,
+        "stable_key": stable_key,
+        "type": str(item.get("resetType") or "unknown_reset"),
+        "status": raw_status or None,
+        "raw_status": raw_status or None,
+        "normalized_status": normalized_status,
+        "is_available": available,
+        "status_inferred": inferred,
+        "granted_at": str(item.get("grantedAt") or ""),
+        "display_name": str(item.get("title") or item.get("displayName") or "Reset"),
+        "expires_on": str(raw_expires_on) if raw_expires_on is not None else None,
+        "expires_at": expires_at,
+        "raw_expiration": raw_expiration,
+        "expiration_parse_failed": expiration_parse_failed,
+    }
+
+
 def parse_reset_entitlements(result: dict, observed_at: str) -> dict:
     if not isinstance(result, dict):
         return {
             "status": "unavailable",
             "message": "暂时无法读取可用重置",
-            "available_count": None,
+            "official_available_count": None,
+            "available_count": 0,
+            "normalized_available_count": 0,
+            "count_list_consistent": True,
             "items": []
         }
     
@@ -1759,66 +1831,48 @@ def parse_reset_entitlements(result: dict, observed_at: str) -> dict:
         return {
             "status": "unavailable",
             "message": "暂时无法读取可用重置",
-            "available_count": None,
+            "official_available_count": None,
+            "available_count": 0,
+            "normalized_available_count": 0,
+            "count_list_consistent": True,
             "items": []
         }
         
     raw_count = reset_credits.get("availableCount")
     try:
-        available_count = int(raw_count) if raw_count is not None else None
+        official_available_count = int(raw_count) if raw_count is not None else None
     except (TypeError, ValueError, OverflowError):
-        available_count = None
+        official_available_count = None
     
     credits_list = reset_credits.get("credits") or []
     items = []
-    
+    now = datetime.now(timezone.utc)
     for item in credits_list:
         if not isinstance(item, dict):
             continue
-        expires_at_timestamp = item.get("expiresAt") or item.get("expires_at")
-        expires_at_str = None
-        expires_on_str = None
-        
-        if expires_at_timestamp is not None:
-            try:
-                expires_at_str = datetime.fromtimestamp(int(expires_at_timestamp), timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
-            except (ValueError, OverflowError, TypeError):
-                pass
-                
-        expires_on_val = item.get("expires_on") or item.get("expiresOn")
-        if expires_on_val is not None:
-            expires_on_str = str(expires_on_val)
-            
-        raw_expiration = str(expires_at_timestamp or expires_on_val or "")
-        
-        status = str(item.get("status") or "unknown")
-        items.append({
-            "id": str(item.get("id") or ""),
-            "type": str(item.get("resetType") or "unknown_reset"),
-            "status": status,
-            "granted_at": str(item.get("grantedAt") or ""),
-            "display_name": str(item.get("title") or "Reset"),
-            "expires_on": expires_on_str,
-            "expires_at": expires_at_str,
-            "raw_expiration": raw_expiration
-        })
-        
-    available_items = [item for item in items if item.get("status", "").lower() == "available"]
-    count_semantics = "official" if available_count is not None else "derived_from_available_items"
-    if available_count is None:
-        available_count = len(available_items)
-    if available_count != len(available_items):
+        items.append(_normalize_reset_credit(item, now))
+
+    available_items = [item for item in items if item.get("is_available") is True]
+    available_count = len(available_items)
+    count_list_consistent = official_available_count is None or official_available_count == available_count
+    if not count_list_consistent:
         print(
-            f"Codex reset entitlement count mismatch: official={available_count} available_items={len(available_items)}",
+            f"Codex reset entitlement count mismatch: official={official_available_count} normalized={available_count}",
             file=sys.stderr,
         )
         
     return {
         "status": "official_live",
         "message": None,
+        "official_available_count": official_available_count,
         "available_count": available_count,
+        "normalized_available_count": available_count,
+        "count_list_consistent": count_list_consistent,
         "items": items,
-        "count_semantics": count_semantics,
+        "entitlements": available_items,
+        "count_semantics": "normalized",
+        "status_inferred_count": sum(1 for item in items if item.get("status_inferred")),
+        "expiration_parse_failures": sum(1 for item in items if item.get("expiration_parse_failed")),
         "source_path": "codex_app_server_rpc",
         "original_field_name": "rateLimitResetCredits.credits",
         "available_count_field_name": "rateLimitResetCredits.availableCount",
@@ -1838,7 +1892,7 @@ def normalize_codex_app_server_rate_limits(result: dict, observed_at: str) -> di
             "reset_entitlements": {
                 "status": "unavailable",
                 "message": "暂时无法读取可用重置",
-                "available_count": None,
+                "available_count": 0,
                 "items": []
             }
         }
@@ -1899,7 +1953,7 @@ def normalize_codex_app_server_rate_limits(result: dict, observed_at: str) -> di
     reset_ent = {
         "status": "unavailable",
         "message": "暂时无法读取可用重置",
-        "available_count": None,
+        "available_count": 0,
         "items": []
     }
     try:
@@ -1927,7 +1981,7 @@ def read_codex_app_server_quota(timeout_seconds: float = 8.0) -> dict:
         "reset_entitlements": {
             "status": "unavailable",
             "message": "暂时无法读取可用重置",
-            "available_count": None,
+            "available_count": 0,
             "items": []
         }
     }
@@ -2066,9 +2120,15 @@ def _observed_success_at(status: dict):
 
 def _stale_reset(previous: dict, attempt_at: str, error_code: str) -> dict:
     stale = dict(previous or {})
+    items = stale.get("items") if isinstance(stale.get("items"), list) else []
+    available_items = [item for item in items if item.get("is_available") is True or ("is_available" not in item and str(item.get("status") or "").strip().lower() in {"available", "active", "ready", "enabled"})]
     stale["status"] = "official_stale"
     stale["message"] = "暂时无法更新，显示上次成功数据"
-    stale["last_success_at"] = _observed_success_at(previous) or previous.get("last_success_at")
+    stale["available_count"] = len(available_items)
+    stale["normalized_available_count"] = len(available_items)
+    stale["count_list_consistent"] = stale.get("official_available_count") is None or stale.get("official_available_count") == len(available_items)
+    stale["entitlements"] = available_items
+    stale["last_success_at"] = _observed_success_at(previous) or previous.get("last_success_at") or previous.get("observed_at")
     stale["last_attempt_at"] = attempt_at
     stale["last_error_code"] = error_code
     return stale
@@ -2142,7 +2202,7 @@ def get_quota_status(convos, codex_calls, local_auth_info=None, previous_dashboa
             "reset_entitlements": {
                 "status": "unavailable",
                 "message": "暂时无法读取可用重置",
-                "available_count": None,
+                "available_count": 0,
                 "items": []
             }
         }

@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 
 SCHEMA_VERSION = 1
-CLI_VERSION = "1.1.4"
+CLI_VERSION = "1.1.5"
 APP_PATH = Path("/Applications/QuotaView.app")
 BUNDLE_BACKEND = APP_PATH / "Contents/Resources/monitor_backend.py"
 BUNDLE_CLI = APP_PATH / "Contents/Resources/quotaview_cli.py"
@@ -112,12 +112,16 @@ def quota_data(source, dashboard):
 
 def reset_data(dashboard):
     status = dashboard.get("quota_status", {}).get("codex", {}).get("reset_entitlements", {})
+    if not isinstance(status, dict) or not status:
+        return {"status": "unavailable", "official_available_count": None, "available_count": None, "normalized_available_count": None, "entitlements": [], "items": [], "count_list_consistent": True, "status_inferred_count": 0, "expiration_parse_failures": 0, "last_success_at": None, "last_attempt_at": None, "last_error_code": None}
     items = []
     for item in status.get("items", []) if isinstance(status, dict) else []:
-        if not isinstance(item, dict) or str(item.get("status", "")).lower() != "available":
+        if not isinstance(item, dict) or not (item.get("is_available") is True or ("is_available" not in item and str(item.get("status", "")).strip().lower() in {"available", "active", "ready", "enabled"})):
             continue
         items.append({"display_name": item.get("display_name", ""), "status": "available", "expires_at": item.get("expires_at"), "expires_on": item.get("expires_on"), "display_time": local_time(item.get("expires_at"))})
-    return {"status": status.get("status", "unavailable"), "available_count": status.get("available_count"), "count_semantics": status.get("count_semantics"), "source_path": status.get("source_path"), "observed_at": status.get("observed_at"), "last_success_at": status.get("last_success_at"), "last_attempt_at": status.get("last_attempt_at"), "last_error_code": status.get("last_error_code"), "items": items}
+    normalized_count = len(items)
+    official_count = status.get("official_available_count")
+    return {"status": status.get("status", "unavailable"), "official_available_count": official_count, "available_count": normalized_count, "normalized_available_count": normalized_count, "entitlements": items, "items": items, "count_list_consistent": official_count is None or official_count == normalized_count, "status_inferred_count": status.get("status_inferred_count", 0), "expiration_parse_failures": status.get("expiration_parse_failures", 0), "count_semantics": "normalized", "source_path": status.get("source_path"), "observed_at": status.get("observed_at"), "last_success_at": status.get("last_success_at"), "last_attempt_at": status.get("last_attempt_at"), "last_error_code": status.get("last_error_code")}
 
 
 def prices_data(source, settings, include_legacy):

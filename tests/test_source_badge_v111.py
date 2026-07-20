@@ -103,8 +103,8 @@ def test_cli_schema_remains_one():
 
 
 def test_readme_and_changelog_are_v112():
-    assert "v1.1.4" in README
+    assert "v1.1.5" in README
     assert "About This Project" in README
-    assert "## [1.1.4]" in CHANGELOG
+    assert "## [1.1.5]" in CHANGELOG
     assert "compact source badge" in CHANGELOG
     assert "轻量来源标识" in CHANGELOG

@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-QuotaView is a native macOS menu bar app for local, read-only monitoring of Antigravity and Codex. The latest release is **v1.1.4**.
+QuotaView is a native macOS menu bar app for local, read-only monitoring of Antigravity and Codex. The latest release is **v1.1.5**.
 
 ## Features
 
@@ -10,6 +10,7 @@ QuotaView is a native macOS menu bar app for local, read-only monitoring of Anti
 - API-equivalent cost estimates (not an official bill);
 - official-live quota status when supported by the installed client;
 - read-only Codex reset entitlements;
+- the reset badge and entitlement list are derived from the same normalized available set;
 - today, last 7 natural days, last 30 natural days, and local all-time history;
 - Chinese and English UI selectable in Settings;
 - light, dark, and system appearance modes;

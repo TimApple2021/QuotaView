@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.1.5] - 2026-07-20
+
+- Fixed an inconsistency where the reset badge could show an available reset while the entitlement list appeared empty.
+- Unified reset availability normalization across the backend, CLI, and Swift UI.
+- Added support for additional entitlement status and expiration formats.
+- Preserved reset counts and entitlement details together as an atomic stale snapshot.
+- Added non-sensitive reset consistency diagnostics to the CLI.
+- No reset, redeem, or consume actions were added.
+
+### v1.1.5（中文）
+
+- 修复重置徽标显示可用次数，但下方权益列表为空的不一致问题。
+- 统一后端、CLI 和 Swift UI 的重置权益可用状态规范化逻辑。
+- 增加对更多状态值和到期时间格式的兼容。
+- stale 状态下将数量与权益详情作为同一个原子快照保留。
+- CLI 增加不含敏感信息的一致性诊断字段。
+- 未增加任何重置、兑换或消耗操作。
+
 ## [1.1.4] - 2026-07-20
 
 - Preserved the last successful quota and reset entitlement data when an official RPC refresh fails temporarily.

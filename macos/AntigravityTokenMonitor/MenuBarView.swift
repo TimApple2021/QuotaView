@@ -439,8 +439,9 @@ struct MenuBarView: View {
                 
                 if let ent = resetEnt {
                     if ent.status == "official_live" || ent.status == "official_stale" {
-                        let availableItems = ent.items.filter { $0.status.lowercased() == "available" }
-                        let count = ent.availableCount ?? availableItems.count
+                        // Count and rows must come from the same normalized entitlement set.
+                        let availableItems = ent.items.filter(\.isAvailable)
+                        let count = availableItems.count
                         
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {

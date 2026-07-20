@@ -270,8 +270,12 @@ struct LossyQuotaItems: Codable {
 
 struct ResetEntitlementItem: Codable, Hashable, Identifiable {
     let entitlementId: String
+    let stableKey: String
     let type: String
     let status: String
+    let normalizedStatus: String
+    let isAvailable: Bool
+    let statusInferred: Bool
     let grantedAt: String?
     let displayName: String
     let expiresOn: String?
@@ -282,7 +286,8 @@ struct ResetEntitlementItem: Codable, Hashable, Identifiable {
     
     enum CodingKeys: String, CodingKey {
         case entitlementId = "id"
-        case type, status
+        case stableKey = "stable_key"
+        case type, status, normalizedStatus = "normalized_status", isAvailable = "is_available", statusInferred = "status_inferred"
         case grantedAt = "granted_at"
         case displayName = "display_name"
         case expiresOn = "expires_on"
@@ -293,10 +298,14 @@ struct ResetEntitlementItem: Codable, Hashable, Identifiable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         entitlementId = (try? c.decode(String.self, forKey: .entitlementId)) ?? ""
+        stableKey = (try? c.decode(String.self, forKey: .stableKey)) ?? entitlementId
         type = (try? c.decode(String.self, forKey: .type)) ?? "unknown_reset"
         // Pre-status dashboards only contained active entitlements; keep them
         // readable until the next live scan supplies the official status.
         status = (try? c.decode(String.self, forKey: .status)) ?? "available"
+        normalizedStatus = (try? c.decode(String.self, forKey: .normalizedStatus)) ?? status.lowercased()
+        isAvailable = (try? c.decode(Bool.self, forKey: .isAvailable)) ?? ["available", "active", "ready", "enabled"].contains(status.lowercased())
+        statusInferred = (try? c.decode(Bool.self, forKey: .statusInferred)) ?? false
         grantedAt = try? c.decode(String.self, forKey: .grantedAt)
         displayName = (try? c.decode(String.self, forKey: .displayName)) ?? "Reset"
         expiresOn = try? c.decode(String.self, forKey: .expiresOn)
