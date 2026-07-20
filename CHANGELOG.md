@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.1.2] - 2026-07-20
+
+- Replaced the refresh icon with a double-arrow cycle symbol.
+- Matched the settings gear’s visual size to the refresh icon.
+- Kept both bottom toolbar controls background-free and visually balanced.
+- No changes to monitoring, quota, pricing, history, or CLI schema.
+
+### v1.1.2（中文）
+
+- 将刷新图标替换为双箭头循环样式。
+- 调整设置齿轮的视觉尺寸，使其与刷新图标保持对称。
+- 两个底栏按钮继续保持无背景、无边框的简洁样式。
+- 不涉及统计、额度、价格、历史或 CLI schema 变更。
+
 ## [1.1.1] - 2026-07-19
 
 - Added a compact source badge to the title bar in single-source mode.

@@ -12,11 +12,12 @@ class TestRefreshAnimationAndSettings(unittest.TestCase):
                 content = f.read()
 
             # 1. 刷新图标 rotationEffect 只作用于内部 Image。
-            self.assertIn("Image(systemName: \"arrow.clockwise\")", content)
+            self.assertIn("Image(systemName: \"arrow.triangle.2.circlepath\")", content)
+            self.assertNotIn("Image(systemName: \"arrow.clockwise\")", content)
             self.assertIn(".rotationEffect(.degrees(angle), anchor: .center)", content)
 
-            # 2. 外层 32x28 frame 不旋转。
-            self.assertIn(".frame(width: 32, height: 28, alignment: .leading)", content)
+            # 2. Custom toolbar button is 32x32 and the outer style does not rotate.
+            self.assertIn(".frame(width: 32, height: 32, alignment: .center)", content)
             
             # 3. 图标旋转 anchor 为 center。
             self.assertIn("anchor: .center", content)

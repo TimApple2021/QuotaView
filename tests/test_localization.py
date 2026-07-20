@@ -5,6 +5,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MODEL = (ROOT / "macos/AntigravityTokenMonitor/TokenDataModel.swift").read_text(encoding="utf-8")
 VIEW = (ROOT / "macos/AntigravityTokenMonitor/MenuBarView.swift").read_text(encoding="utf-8")
 README = (ROOT / "README.md").read_text(encoding="utf-8")
+README_ZH = (ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
 BUILD = (ROOT / "macos/build.sh").read_text(encoding="utf-8")
 
 
@@ -25,11 +26,11 @@ def test_main_ui_has_bilingual_localization_entries():
 
 
 def test_readme_is_bilingual():
-    assert "## English" in README
-    assert "## 中文" in README
+    assert "**English** | [简体中文](README.zh-CN.md)" in README
+    assert "[English](README.md) | **简体中文**" in README_ZH
     assert "Chinese and English UI selectable in Settings" in README
-    assert "设置页可选择中文或 English" in README
+    assert "设置页可选择中文或 English" in README_ZH
 
 
 def test_release_build_version_is_bumped():
-    assert 'VERSION="1.1.1"' in BUILD
+    assert 'VERSION="1.1.2"' in BUILD

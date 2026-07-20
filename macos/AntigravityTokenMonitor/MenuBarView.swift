@@ -56,6 +56,7 @@ struct QuotaViewPalette {
     let sourceBadgeBackground: Color
     let sourceBadgeText: Color
     let sourceBadgeBorder: Color
+    let refreshButtonIcon: Color
     let orange: Color
     let red: Color
     let successText: Color
@@ -90,6 +91,7 @@ struct QuotaViewPalette {
         sourceBadgeBackground = sourceBlue.opacity(light ? 0.10 : 0.18)
         sourceBadgeText = light ? Color(nsColor: .secondaryLabelColor) : Color(nsColor: .labelColor)
         sourceBadgeBorder = sourceBlue.opacity(light ? 0.15 : 0.20)
+        refreshButtonIcon = Color(nsColor: .secondaryLabelColor)
         orange = Color(nsColor: .systemOrange)
         red = Color(nsColor: .systemRed)
         successText = Color(nsColor: .systemGreen)
@@ -314,11 +316,12 @@ struct MenuBarView: View {
             Divider().background(palette.divider).padding(.top, 8)
             HStack {
                 Button { dataModel.triggerScan() } label: {
-                    RefreshButtonIcon(isScanning: dataModel.isScanning)
-                        .frame(width: 32, height: 28, alignment: .leading)
-                        .contentShape(Rectangle())
+                    RefreshButtonIcon(isScanning: dataModel.isScanning, palette: palette)
+                        .frame(width: 32, height: 32, alignment: .center)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(RefreshButtonStyle())
+                .disabled(dataModel.isScanning)
+                .accessibilityLabel(dataModel.isScanning ? dataModel.tr("正在刷新数据", "Refreshing Data") : dataModel.tr("刷新数据", "Refresh Data"))
                 .help(dataModel.isScanning ? dataModel.tr("刷新中…", "Refreshing…") : dataModel.tr("刷新", "Refresh"))
                 
                 Spacer()
@@ -327,9 +330,9 @@ struct MenuBarView: View {
                     withAnimation(.easeInOut(duration: 0.18)) { page = .settings }
                 } label: {
                     Image(systemName: "gearshape")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 20, weight: .medium))
                         .foregroundColor(palette.secondaryText)
-                        .frame(width: 32, height: 28, alignment: .trailing)
+                        .frame(width: 32, height: 32, alignment: .center)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -1070,8 +1073,17 @@ struct MenuBarView: View {
     }
 }
 
+struct RefreshButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
 struct RefreshButtonIcon: View {
     let isScanning: Bool
+    let palette: QuotaViewPalette
     @State private var refreshAnimationStart: Date? = nil
 
     var body: some View {
@@ -1090,9 +1102,9 @@ struct RefreshButtonIcon: View {
                 : 0.0
 
             ZStack {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(Color(nsColor: .secondaryLabelColor).opacity(isScanning ? 0.85 : 1.0))
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(isScanning ? palette.primaryText : palette.refreshButtonIcon)
                     .rotationEffect(.degrees(angle), anchor: .center)
             }
             .frame(width: 20, height: 20, alignment: .center)
