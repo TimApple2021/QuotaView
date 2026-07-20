@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 
 SCHEMA_VERSION = 1
-CLI_VERSION = "1.1.3"
+CLI_VERSION = "1.1.4"
 APP_PATH = Path("/Applications/QuotaView.app")
 BUNDLE_BACKEND = APP_PATH / "Contents/Resources/monitor_backend.py"
 BUNDLE_CLI = APP_PATH / "Contents/Resources/quotaview_cli.py"
@@ -103,7 +103,7 @@ def quota_data(source, dashboard):
             if not isinstance(item, dict) or item.get("confidence") != "official_live":
                 continue
             items.append({key: item.get(key) for key in ("name", "group", "window", "raw_percent", "used_percent", "percent_semantics", "reset_time", "observed_at", "source_path", "original_field_name", "plan_type", "plan_display_name", "plan_source", "plan_confidence") if key in item})
-        result[name] = {"status": status.get("status", "unavailable"), "message": status.get("message", ""), "items": items}
+        result[name] = {"status": status.get("status", "unavailable"), "message": status.get("message", ""), "last_success_at": status.get("last_success_at"), "last_attempt_at": status.get("last_attempt_at"), "last_error_code": status.get("last_error_code"), "items": items}
         for key in ("plan_type", "plan_display_name", "plan_source", "plan_confidence", "plan_mismatch"):
             if key in status:
                 result[name][key] = status[key]
@@ -117,7 +117,7 @@ def reset_data(dashboard):
         if not isinstance(item, dict) or str(item.get("status", "")).lower() != "available":
             continue
         items.append({"display_name": item.get("display_name", ""), "status": "available", "expires_at": item.get("expires_at"), "expires_on": item.get("expires_on"), "display_time": local_time(item.get("expires_at"))})
-    return {"status": status.get("status", "unavailable"), "available_count": status.get("available_count"), "count_semantics": status.get("count_semantics"), "source_path": status.get("source_path"), "observed_at": status.get("observed_at"), "items": items}
+    return {"status": status.get("status", "unavailable"), "available_count": status.get("available_count"), "count_semantics": status.get("count_semantics"), "source_path": status.get("source_path"), "observed_at": status.get("observed_at"), "last_success_at": status.get("last_success_at"), "last_attempt_at": status.get("last_attempt_at"), "last_error_code": status.get("last_error_code"), "items": items}
 
 
 def prices_data(source, settings, include_legacy):

@@ -1696,7 +1696,7 @@ def normalize_antigravity_quota_rpc_response(payload: dict, observed_at: str) ->
     return {"status": "official_live", "message": "", "items": items}
 
 
-def read_antigravity_live_quota() -> dict:
+def read_antigravity_live_quota(timeout_seconds: float = 8.0) -> dict:
     """Refresh current quota through Antigravity's official local language_server RPC."""
     import ssl
     import urllib.request
@@ -1720,7 +1720,7 @@ def read_antigravity_live_quota() -> dict:
         with urllib.request.urlopen(
             request,
             context=ssl._create_unverified_context(),
-            timeout=8,
+            timeout=timeout_seconds,
         ) as response:
             payload = decode_grpc_web_json_message(response.read())
         observed_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -2004,6 +2004,8 @@ def _apply_codex_plan_metadata(status: dict, local_auth_info=None) -> dict:
     if not isinstance(status, dict):
         return status
     items = status.get("items") if isinstance(status.get("items"), list) else []
+    if status.get("status") == "official_stale" and items:
+        return status
     official_type = normalize_codex_plan_type(status.get("plan_type"))
     local_type = normalize_codex_plan_type((local_auth_info or {}).get("plan_type"))
     if official_type != "unknown":
@@ -2027,7 +2029,106 @@ def _apply_codex_plan_metadata(status: dict, local_auth_info=None) -> dict:
     return status
 
 
-def get_quota_status(convos, codex_calls, local_auth_info=None):
+def _read_with_retries(reader, total_timeout=12.0, sleep_fn=None):
+    """Retry only the official reader, with a bounded total refresh time."""
+    sleep_fn = sleep_fn or time.sleep
+    delays = (0.5, 1.0, 2.0)
+    deadline = time.monotonic() + total_timeout
+    last = None
+    permanent_errors = {"authentication_failure", "permission_denied", "schema_incompatible", "not_logged_in"}
+    for attempt in range(4):
+        remaining = max(0.5, deadline - time.monotonic())
+        try:
+            last = reader(remaining)
+        except Exception:
+            last = None
+        if isinstance(last, dict) and last.get("status") == "official_live":
+            return last
+        if isinstance(last, dict) and last.get("last_error_code") in permanent_errors:
+            break
+        if attempt >= 3 or time.monotonic() >= deadline:
+            break
+        sleep_fn(min(delays[attempt], max(0.0, deadline - time.monotonic())))
+    return last if isinstance(last, dict) else {"status": "unavailable", "items": []}
+
+
+def _observed_success_at(status: dict):
+    if not isinstance(status, dict):
+        return None
+    if status.get("last_success_at"):
+        return status["last_success_at"]
+    observed = [item.get("observed_at") for item in status.get("items", []) if isinstance(item, dict) and item.get("observed_at")]
+    reset = status.get("reset_entitlements") or {}
+    if reset.get("observed_at"):
+        observed.append(reset["observed_at"])
+    return max(observed) if observed else None
+
+
+def _stale_reset(previous: dict, attempt_at: str, error_code: str) -> dict:
+    stale = dict(previous or {})
+    stale["status"] = "official_stale"
+    stale["message"] = "暂时无法更新，显示上次成功数据"
+    stale["last_success_at"] = _observed_success_at(previous) or previous.get("last_success_at")
+    stale["last_attempt_at"] = attempt_at
+    stale["last_error_code"] = error_code
+    return stale
+
+
+def _merge_quota_snapshot(source: str, current: dict, previous: dict, attempt_at: str) -> dict:
+    """Apply stale-while-revalidate without allowing a failed read to erase data."""
+    current = dict(current or {})
+    previous = dict(previous or {})
+    error_code = current.get("last_error_code") or "transient_invalid_response"
+    if current.get("status") == "official_live":
+        current["last_success_at"] = current.get("last_success_at") or _observed_success_at(current) or attempt_at
+        current["last_attempt_at"] = attempt_at
+        current.pop("last_error_code", None)
+        reset = current.get("reset_entitlements")
+        previous_reset = previous.get("reset_entitlements")
+        if source == "codex" and (not isinstance(reset, dict) or reset.get("status") != "official_live") and isinstance(previous_reset, dict) and previous_reset.get("items"):
+            current["reset_entitlements"] = _stale_reset(previous_reset, attempt_at, error_code)
+        elif isinstance(reset, dict) and reset.get("status") == "official_live":
+            reset = dict(reset)
+            reset["last_success_at"] = reset.get("last_success_at") or reset.get("observed_at") or current["last_success_at"]
+            reset["last_attempt_at"] = attempt_at
+            reset.pop("last_error_code", None)
+            current["reset_entitlements"] = reset
+        return current
+
+    if previous.get("items"):
+        stale = dict(previous)
+        stale["status"] = "official_stale"
+        stale["message"] = "暂时无法更新，显示上次成功数据"
+        stale["last_success_at"] = _observed_success_at(previous)
+        stale["last_attempt_at"] = attempt_at
+        stale["last_error_code"] = error_code
+        if isinstance(previous.get("reset_entitlements"), dict) and previous["reset_entitlements"].get("items"):
+            stale["reset_entitlements"] = _stale_reset(previous["reset_entitlements"], attempt_at, error_code)
+        return stale
+
+    result = dict(current)
+    result["status"] = "unavailable"
+    result["last_attempt_at"] = attempt_at
+    result["last_error_code"] = error_code
+    previous_reset = previous.get("reset_entitlements")
+    if source == "codex" and isinstance(previous_reset, dict) and previous_reset.get("items"):
+        result["reset_entitlements"] = _stale_reset(previous_reset, attempt_at, error_code)
+    return result
+
+
+def _preserve_nonzero_source_stats(result: dict, previous_dashboard: dict) -> dict:
+    """Keep the last non-zero source summary when a local scan is transiently empty."""
+    previous_sources = previous_dashboard.get("sources", {}) if isinstance(previous_dashboard, dict) else {}
+    for source_key, source_stats in result.get("sources", {}).items():
+        previous_stats = previous_sources.get(source_key, {}) if isinstance(previous_sources, dict) else {}
+        current_all = source_stats.get("all_time", {})
+        previous_all = previous_stats.get("all_time", {}) if isinstance(previous_stats, dict) else {}
+        if current_all.get("identifiable_tokens", 0) == 0 and previous_all.get("identifiable_tokens", 0) > 0:
+            result["sources"][source_key] = previous_stats
+    return result
+
+
+def get_quota_status(convos, codex_calls, local_auth_info=None, previous_dashboard=None):
     """
     Returns verified official live quota data.
     Only items with confidence == "official_live" are returned.
@@ -2047,17 +2148,25 @@ def get_quota_status(convos, codex_calls, local_auth_info=None):
         }
     }
     
+    previous_status = (previous_dashboard or {}).get("quota_status", {}) if isinstance(previous_dashboard, dict) else {}
+    attempt_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    retry = previous_dashboard is not None
+
     # 1. Antigravity Quota
     try:
-        qstatus["antigravity"] = read_antigravity_live_quota()
+        ag_reader = (lambda timeout: read_antigravity_live_quota(timeout))
+        current_ag = _read_with_retries(ag_reader) if retry else read_antigravity_live_quota()
+        qstatus["antigravity"] = _merge_quota_snapshot("antigravity", current_ag, previous_status.get("antigravity", {}), attempt_at)
     except:
-        pass
+        qstatus["antigravity"] = _merge_quota_snapshot("antigravity", {}, previous_status.get("antigravity", {}), attempt_at)
         
     # 2. Codex official app-server quota (never historical JSONL rate limits)
     try:
-        qstatus["codex"] = read_codex_app_server_quota()
+        codex_reader = (lambda timeout: read_codex_app_server_quota(timeout))
+        current_codex = _read_with_retries(codex_reader) if retry else read_codex_app_server_quota()
+        qstatus["codex"] = _merge_quota_snapshot("codex", current_codex, previous_status.get("codex", {}), attempt_at)
     except:
-        pass
+        qstatus["codex"] = _merge_quota_snapshot("codex", {}, previous_status.get("codex", {}), attempt_at)
     qstatus["codex"] = _apply_codex_plan_metadata(qstatus["codex"], local_auth_info)
         
     return qstatus
@@ -2070,6 +2179,10 @@ def _get_aggregated_stats_unlocked():
     """
     from datetime import date as date_cls, timedelta
 
+    previous_dashboard = _safe_load_json(os.path.join(DATA_DIR, "dashboard.json"), {})
+    operation_started_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    operation_id = hashlib.sha256(f"{time.time_ns()}|{os.getpid()}".encode()).hexdigest()[:20]
+    operation_sequence = time.time_ns()
     scan_result = scan_conversations()
     if len(scan_result) == 2:
         convos, scanner_stats = scan_result
@@ -2521,6 +2634,11 @@ def _get_aggregated_stats_unlocked():
 
     result = {
         "last_scan_time":    scanner_stats["last_scan_time"],
+        "refresh_operation": {
+            "operation_id": operation_id,
+            "sequence": operation_sequence,
+            "started_at": operation_started_at,
+        },
         "scan_duration_ms":  scanner_stats["scan_duration_ms"],
         "today_has_hourly":  today_has_hourly,
         "sources": {
@@ -2543,14 +2661,17 @@ def _get_aggregated_stats_unlocked():
         "codex_auth_info": codex_auth_info,
         "scanner_stats":  scanner_stats,
         "quota_events":   scan_quota_events(),
-        "quota_status":   get_quota_status(convos, codex_calls, codex_auth_info),
+        "quota_status":   get_quota_status(convos, codex_calls, codex_auth_info, previous_dashboard),
         "pricing_tier":   settings.get("pricing_tier", "standard"),
     }
+
+    # A transient local scan failure must not replace a non-zero historical
+    # source with an all-zero snapshot. The next successful scan can refresh it.
+    result = _preserve_nonzero_source_stats(result, previous_dashboard)
 
     # Keep the compact artifact byte-for-byte stable on a no-op rescan. The
     # volatile scan timestamp/duration are still refreshed whenever statistics
     # actually change.
-    previous_dashboard = _safe_load_json(os.path.join(DATA_DIR, "dashboard.json"), {})
     # Never resurrect a historical plan label when the current official/local
     # readers have no plan value. This avoids guessing Plus from old dashboards.
     codex_quota = result["quota_status"].get("codex", {})

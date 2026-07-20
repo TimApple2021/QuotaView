@@ -2,7 +2,7 @@
 
 [English](README.md) | **简体中文**
 
-QuotaView 是一款原生 macOS 菜单栏应用，用于本地、只读监控 Antigravity 和 Codex。当前最新版本为 **v1.1.3**。
+QuotaView 是一款原生 macOS 菜单栏应用，用于本地、只读监控 Antigravity 和 Codex。当前最新版本为 **v1.1.4**。
 
 ## 功能
 

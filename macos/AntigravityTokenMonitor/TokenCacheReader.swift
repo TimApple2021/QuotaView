@@ -472,6 +472,9 @@ struct TokenCacheReader {
                 do {
                     let data = try Data(contentsOf: URL(fileURLWithPath: path))
                     let dashboard = try JSONDecoder().decode(LightDashboard.self, from: data)
+                    if index == 1 {
+                        restorePrimaryDashboard(data)
+                    }
                     lastError = nil
                     return dashboard
                 } catch {
@@ -484,6 +487,21 @@ struct TokenCacheReader {
         }
         lastError = diagnostics.joined(separator: " | ")
         return .empty
+    }
+
+    private static func restorePrimaryDashboard(_ data: Data) {
+        let temporary = dashboardPath + ".restore.tmp"
+        do {
+            try data.write(to: URL(fileURLWithPath: temporary), options: .atomic)
+            let primary = URL(fileURLWithPath: dashboardPath)
+            if FileManager.default.fileExists(atPath: dashboardPath) {
+                _ = try FileManager.default.replaceItemAt(primary, withItemAt: URL(fileURLWithPath: temporary))
+            } else {
+                try FileManager.default.moveItem(at: URL(fileURLWithPath: temporary), to: primary)
+            }
+        } catch {
+            try? FileManager.default.removeItem(atPath: temporary)
+        }
     }
 
     private static func describe(_ error: Error) -> String {

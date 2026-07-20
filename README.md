@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-QuotaView is a native macOS menu bar app for local, read-only monitoring of Antigravity and Codex. The latest release is **v1.1.3**.
+QuotaView is a native macOS menu bar app for local, read-only monitoring of Antigravity and Codex. The latest release is **v1.1.4**.
 
 ## Features
 

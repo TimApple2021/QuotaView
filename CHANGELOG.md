@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.1.4] - 2026-07-20
+
+- Preserved the last successful quota and reset entitlement data when an official RPC refresh fails temporarily.
+- Added `official_stale` status with last-success and last-attempt metadata.
+- Added limited retries for transient transport failures.
+- Prevented failed token scans from replacing existing usage data with zeros.
+- Added dashboard backup recovery and additional refresh sequencing safeguards.
+- No changes to token pricing, quota calculations, local history, or CLI schema.
+
+### v1.1.4（中文）
+
+- 官方 RPC 瞬时刷新失败时，保留上一次成功的额度和重置权益数据。
+- 增加 `official_stale` 状态及最近成功、最近尝试时间信息。
+- 为瞬时传输错误增加有限重试。
+- 防止 Token 扫描失败时用零覆盖已有使用数据。
+- 增加 dashboard 备份恢复和刷新顺序保护。
+- 不涉及 Token 定价、额度计算、本地历史或 CLI schema 变更。
+
 ## [1.1.3] - 2026-07-20
 
 - Migrated runtime data to the canonical macOS Application Support directory.

@@ -371,6 +371,12 @@ struct MenuBarView: View {
                 .font(.system(size: 11, weight: .bold))
                 .foregroundColor(palette.primaryText)
                 .padding(.bottom, 2)
+
+            if quota?.status == "official_stale" {
+                Text(dataModel.tr("暂时无法更新，显示上次成功数据", "Unable to refresh; showing last successful data"))
+                    .font(.system(size: 9))
+                    .foregroundColor(palette.secondaryText)
+            }
             
             // 1. Weekly limits
             if items.isEmpty {
@@ -432,7 +438,7 @@ struct MenuBarView: View {
                     .padding(.vertical, 4)
                 
                 if let ent = resetEnt {
-                    if ent.status == "official_live" {
+                    if ent.status == "official_live" || ent.status == "official_stale" {
                         let availableItems = ent.items.filter { $0.status.lowercased() == "available" }
                         let count = ent.availableCount ?? availableItems.count
                         
@@ -449,6 +455,12 @@ struct MenuBarView: View {
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
                                     .background(Capsule().fill(palette.successBackground))
+                            }
+
+                            if ent.status == "official_stale" {
+                                Text(dataModel.tr("暂时无法更新，显示上次成功数据", "Unable to refresh; showing last successful data"))
+                                    .font(.system(size: 9))
+                                    .foregroundColor(palette.secondaryText)
                             }
                             
                             if availableItems.isEmpty {
