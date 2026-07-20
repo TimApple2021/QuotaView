@@ -2,7 +2,7 @@
 
 [English](README.md) | **简体中文**
 
-QuotaView 是一款原生 macOS 菜单栏应用，用于本地、只读监控 Antigravity 和 Codex。当前最新版本为 **v1.1.2**。
+QuotaView 是一款原生 macOS 菜单栏应用，用于本地、只读监控 Antigravity 和 Codex。当前最新版本为 **v1.1.3**。
 
 ## 功能
 
@@ -17,6 +17,8 @@ QuotaView 是一款原生 macOS 菜单栏应用，用于本地、只读监控 An
 - 可选择同时显示两个来源，或仅显示 Antigravity / Codex。
 
 QuotaView 将自身历史和设置保存在本机，不向开发者运营的服务器发送遥测或账户数据。官方客户端仍可能正常连接其自身服务。QuotaView 不写回官方客户端接口，也不执行额度 reset、redeem、consume 或修改操作。
+
+安装版将运行数据保存在 `~/Library/Application Support/Antigravity Token Monitor/`；安装后不依赖项目源码目录。
 
 Codex 套餐名称来自已安装官方客户端本地 `account/rateLimits/read` 响应中的 `rateLimitsByLimitId.codex.planType`。QuotaView 不根据额度百分比或用量猜测套餐。若官方响应缺少套餐字段，可显示带有较低置信度的本地 token 事件观察值；两者都没有时保持未知。
 

@@ -16,11 +16,16 @@ from datetime import datetime
 from pathlib import Path
 
 SCHEMA_VERSION = 1
-CLI_VERSION = "1.1.2"
+CLI_VERSION = "1.1.3"
 APP_PATH = Path("/Applications/QuotaView.app")
 BUNDLE_BACKEND = APP_PATH / "Contents/Resources/monitor_backend.py"
 BUNDLE_CLI = APP_PATH / "Contents/Resources/quotaview_cli.py"
 RUNTIME_DIR = Path(os.environ.get("TOKEN_MONITOR_DATA_DIR", str(Path.home() / "Library/Application Support/Antigravity Token Monitor")))
+RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    os.chmod(RUNTIME_DIR, 0o700)
+except OSError:
+    pass
 
 CURRENT_AG = ["claude-opus-4-6-thinking", "claude-sonnet-4-6", "gemini-3.5-flash", "gemini-3.1-pro", "gpt-oss-120b"]
 CURRENT_CODEX = ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5"]

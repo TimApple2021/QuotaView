@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.1.3] - 2026-07-20
+
+- Migrated runtime data to the canonical macOS Application Support directory.
+- Removed production dependencies on the development project directory.
+- Added safe one-time runtime data migration and atomic persistence.
+- Prevented executable app bundles from being stored in backup directories.
+- Fixed a condition that could allow an old backup build to relaunch at login.
+
+### v1.1.3（中文）
+
+- 将运行数据迁移到规范的 macOS Application Support 目录。
+- 移除正式版本对开发项目目录的依赖。
+- 增加安全的一次性数据迁移与原子写入。
+- 禁止在备份目录中保留可执行 App Bundle。
+- 修复旧备份版本可能在登录时重新启动的问题。
+
 ## [1.1.2] - 2026-07-20
 
 - Replaced the refresh icon with a double-arrow cycle symbol.

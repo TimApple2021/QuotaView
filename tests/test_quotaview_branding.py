@@ -53,7 +53,8 @@ class TestQuotaViewBranding(unittest.TestCase):
         self.assertNotIn('APP_NAME="Antigravity Token Monitor"', BUILD)
 
     def test_old_history_is_never_overwritten_during_compatibility_migration(self):
-        self.assertIn('[ ! -e "$SUPPORT_DIR/$file" ]', BUILD)
+        self.assertIn('runtime_migration.py', BUILD)
+        self.assertIn('migrate_runtime', (ROOT / "runtime_migration.py").read_text(encoding="utf-8"))
         self.assertNotIn('rm -rf "$SUPPORT_DIR"', BUILD)
 
     def test_template_icon_is_marked_template(self):

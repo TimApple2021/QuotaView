@@ -6,7 +6,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MACOS_DIR="$PROJECT_DIR/macos"
 APP_NAME="QuotaView"
 EXECUTABLE_NAME="QuotaView"
-VERSION="1.1.2"
+VERSION="1.1.3"
 APP_BUNDLE="$PROJECT_DIR/$APP_NAME.app"
 BIN_DIR="$APP_BUNDLE/Contents/MacOS"
 RES_DIR="$APP_BUNDLE/Contents/Resources"
@@ -22,17 +22,12 @@ mkdir -p "$RES_DIR"
 echo "=== 3. 打包后端并兼容原 Application Support 数据 ==="
 cp "$PROJECT_DIR/monitor_backend.py" "$RES_DIR/monitor_backend.py"
 cp "$PROJECT_DIR/cli/quotaview_cli.py" "$RES_DIR/quotaview_cli.py"
+cp "$PROJECT_DIR/runtime_migration.py" "$RES_DIR/runtime_migration.py"
 chmod 755 "$RES_DIR/quotaview_cli.py"
 SUPPORT_DIR="$HOME/Library/Application Support/Antigravity Token Monitor"
 mkdir -p "$SUPPORT_DIR"
-MIGRATION_BACKUP_DIR="$PROJECT_DIR/data/backup/application_support_migration_$(date +%Y%m%d_%H%M%S)"
-mkdir -p "$MIGRATION_BACKUP_DIR"
-for file in dashboard.json dashboard.json.bak settings.json daily_history.json daily_history.json.bak conversation_history.json conversation_history.json.bak codex_scan_cache.json; do
-    if [ -f "$PROJECT_DIR/data/$file" ] && [ ! -e "$SUPPORT_DIR/$file" ]; then
-        cp -p "$PROJECT_DIR/data/$file" "$MIGRATION_BACKUP_DIR/$file"
-        cp -p "$PROJECT_DIR/data/$file" "$SUPPORT_DIR/$file"
-    fi
-done
+chmod 700 "$SUPPORT_DIR"
+python3 "$PROJECT_DIR/runtime_migration.py" --source "$PROJECT_DIR/data" --target "$SUPPORT_DIR"
 
 cp "$PROJECT_DIR/branding/QuotaView/QuotaView.icns" "$RES_DIR/QuotaView.icns"
 cp "$PROJECT_DIR/branding/QuotaView/menu-bar/QuotaViewMenuTemplate-18.png" "$RES_DIR/QuotaViewMenuTemplate-18.png"
@@ -66,7 +61,7 @@ cat << EOF > "$APP_BUNDLE/Contents/Info.plist"
     <key>CFBundleShortVersionString</key>
     <string>$VERSION</string>
     <key>CFBundleVersion</key>
-    <string>112</string>
+    <string>113</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>LSUIElement</key>
