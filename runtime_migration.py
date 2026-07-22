@@ -12,6 +12,7 @@ import argparse
 import copy
 import json
 import os
+import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,6 +29,8 @@ RUNTIME_FILES = (
     "settings.json.bak",
     "codex_scan_cache.json",
 )
+
+PROJECT_DATA_WARNING = "警告：开发目录数据不得自动导入正式运行目录。"
 
 
 def load_json(path: Path):
@@ -141,7 +144,10 @@ def main() -> int:
     parser.add_argument("--source", required=True, type=Path)
     parser.add_argument("--target", required=True, type=Path)
     args = parser.parse_args()
-    print(json.dumps(migrate_runtime(args.source, args.target), ensure_ascii=False, sort_keys=True))
+    source = args.source.expanduser().resolve()
+    if source.name == "data":
+        print(PROJECT_DATA_WARNING, file=sys.stderr)
+    print(json.dumps(migrate_runtime(source, args.target), ensure_ascii=False, sort_keys=True))
     return 0
 
 

@@ -46,16 +46,16 @@ class TestQuotaViewBranding(unittest.TestCase):
 
     def test_legacy_application_support_path_is_preserved(self):
         self.assertIn('appendingPathComponent("Antigravity Token Monitor"', SWIFT)
-        self.assertIn('Application Support/Antigravity Token Monitor', BUILD)
+        self.assertNotIn('Application Support/Antigravity Token Monitor', BUILD)
 
     def test_build_installs_quotaview_in_applications(self):
         self.assertIn('GLOBAL_DEST="/Applications/$APP_NAME.app"', BUILD)
         self.assertNotIn('APP_NAME="Antigravity Token Monitor"', BUILD)
 
     def test_old_history_is_never_overwritten_during_compatibility_migration(self):
-        self.assertIn('runtime_migration.py', BUILD)
+        self.assertNotIn('runtime_migration.py', BUILD)
         self.assertIn('migrate_runtime', (ROOT / "runtime_migration.py").read_text(encoding="utf-8"))
-        self.assertNotIn('rm -rf "$SUPPORT_DIR"', BUILD)
+        self.assertNotIn('PROJECT_DIR/data', BUILD)
 
     def test_template_icon_is_marked_template(self):
         brand = (SWIFT_DIR / "BrandAssets.swift").read_text(encoding="utf-8")

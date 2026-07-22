@@ -1318,13 +1318,10 @@ def scan_conversations():
     files_error = 0
 
     # Load cache
-    cache = {}
-    if os.path.exists(CACHE_FILE):
-        try:
-            with open(CACHE_FILE, "r", encoding="utf-8") as f:
-                cache = json.load(f)
-        except Exception:
-            pass
+    # Cache corruption must not erase history or cause duplicate counting.
+    # Prefer the primary file, then the atomic writer's .bak, otherwise start
+    # with an empty cache and rebuild safely from source logs.
+    cache = _safe_load_json(CACHE_FILE, {})
 
     conversations = {}
     
@@ -1541,12 +1538,10 @@ def scan_conversations():
         settings["discovered_models"] = discovered_models
         save_settings(settings)
 
-    # Save updated cache
-    try:
-        with open(CACHE_FILE, "w", encoding="utf-8") as f:
-            json.dump(cache, f, indent=2, ensure_ascii=False)
-    except Exception:
-        pass
+    # Save updated cache using the same atomic, fsynced JSON path as the
+    # history/dashboard writers. A failed cache write leaves the last valid
+    # cache in place and never affects the primary token ledger.
+    _atomic_write_json(CACHE_FILE, cache)
 
     scan_duration_ms = int((time.time() - start_time) * 1000)
     last_scan_time = datetime.now().astimezone().isoformat(timespec="seconds")
@@ -2919,6 +2914,13 @@ def _atomic_write_json(path: str, data: dict):
         os.replace(tmp_path, path)
     except Exception as e:
         print(f"警告: 原子写入 {path} 失败: {e}", file=sys.stderr)
+    finally:
+        # Never leave a partial temporary file behind after a failed write.
+        try:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+        except OSError:
+            pass
 
 
 def _safe_load_json(path: str, default: dict) -> dict:

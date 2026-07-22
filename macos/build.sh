@@ -6,7 +6,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MACOS_DIR="$PROJECT_DIR/macos"
 APP_NAME="QuotaView"
 EXECUTABLE_NAME="QuotaView"
-VERSION="1.1.6"
+VERSION="1.1.7"
 APP_BUNDLE="$PROJECT_DIR/$APP_NAME.app"
 BIN_DIR="$APP_BUNDLE/Contents/MacOS"
 RES_DIR="$APP_BUNDLE/Contents/Resources"
@@ -19,15 +19,10 @@ rm -rf "$APP_BUNDLE"
 mkdir -p "$BIN_DIR"
 mkdir -p "$RES_DIR"
 
-echo "=== 3. 打包后端并兼容原 Application Support 数据 ==="
+echo "=== 3. 打包后端资源 ==="
 cp "$PROJECT_DIR/monitor_backend.py" "$RES_DIR/monitor_backend.py"
 cp "$PROJECT_DIR/cli/quotaview_cli.py" "$RES_DIR/quotaview_cli.py"
-cp "$PROJECT_DIR/runtime_migration.py" "$RES_DIR/runtime_migration.py"
 chmod 755 "$RES_DIR/quotaview_cli.py"
-SUPPORT_DIR="$HOME/Library/Application Support/Antigravity Token Monitor"
-mkdir -p "$SUPPORT_DIR"
-chmod 700 "$SUPPORT_DIR"
-python3 "$PROJECT_DIR/runtime_migration.py" --source "$PROJECT_DIR/data" --target "$SUPPORT_DIR"
 
 cp "$PROJECT_DIR/branding/QuotaView/QuotaView.icns" "$RES_DIR/QuotaView.icns"
 cp "$PROJECT_DIR/branding/QuotaView/menu-bar/QuotaViewMenuTemplate-18.png" "$RES_DIR/QuotaViewMenuTemplate-18.png"
@@ -61,7 +56,7 @@ cat << EOF > "$APP_BUNDLE/Contents/Info.plist"
     <key>CFBundleShortVersionString</key>
     <string>$VERSION</string>
     <key>CFBundleVersion</key>
-    <string>116</string>
+    <string>117</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>LSUIElement</key>

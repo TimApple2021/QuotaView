@@ -78,7 +78,21 @@ def test_production_path_contract_is_explicit_and_shared():
     assert "Library/Application Support/Antigravity Token Monitor" in cli
     assert "TokenRuntimePaths.appSupportDirectory.path" in scanner
     assert 'appendingPathComponent("Antigravity Token Monitor"' in reader
-    assert "runtime_migration.py" in build
+    assert "runtime_migration.py" not in build
+
+
+def test_build_does_not_import_project_data_or_write_application_support():
+    build = (ROOT / "macos/build.sh").read_text(encoding="utf-8")
+    assert '"$PROJECT_DIR/data"' not in build
+    assert "migrate_runtime" not in build
+    assert "Library/Application Support/Antigravity Token Monitor" not in build
+
+
+def test_runtime_migration_requires_explicit_source_and_target_and_warns_for_project_data():
+    migration = (ROOT / "runtime_migration.py").read_text(encoding="utf-8")
+    assert 'required=True, type=Path' in migration
+    assert 'PROJECT_DATA_WARNING' in migration
+    assert 'file=sys.stderr' in migration
 
 
 def test_release_backup_directories_have_no_executable_app_bundles():

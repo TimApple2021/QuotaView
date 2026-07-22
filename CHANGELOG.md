@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.1.7] - 2026-07-22
+
+- Moved historical model ID parsing off the Swift main thread using a background utility queue; a generation counter prevents stale results from overwriting a newer refresh.
+- Added atomic writes, fsync, and `.bak` backup recovery for the Codex scan cache; a corrupt cache no longer affects the primary token ledger.
+- Unified menu-bar accumulated-cost formatting: both Antigravity and Codex now display `$X.XX` (removed the `C` suffix for Codex).
+- Replaced all six `.pickerStyle(.menu)` settings pickers with `StableSettingsMenu`, a reusable `Menu`-based control that opens from a fixed anchor and avoids the system-repositioning behaviour near the top of the screen.
+- Removed the automatic invocation of `runtime_migration.py` from `macos/build.sh`; the migration utility now requires an explicit `--source` and `--target` and prints a warning when the project `data/` directory is used as a source.
+- App Resources no longer include `runtime_migration.py` or any runtime JSON files.
+- Regression tests for all of the above changes.
+- No changes to CLI schema, token totals, quota calculations, model pricing, or reset entitlement behaviour.
+
+### v1.1.7（中文）
+
+- 将历史模型 ID 解析移至 Swift Utility 后台队列；使用 generation 计数器防止旧的异步结果覆盖新刷新结果。
+- 为 Codex 扫描缓存添加原子写入、fsync 和 `.bak` 备份恢复；缓存损坏不再影响主账本。
+- 统一菜单栏"累计费用"格式：Antigravity 和 Codex 均显示 `$X.XX`（删除 Codex 的 `C` 后缀）。
+- 将设置页六个 `.pickerStyle(.menu)` 选择器替换为可复用的 `StableSettingsMenu`，从固定锚点弹出菜单，避免在屏幕顶部附近时系统重新定位。
+- 从 `macos/build.sh` 删除 `runtime_migration.py` 的自动调用；迁移工具现在要求显式提供 `--source` 和 `--target`，使用项目 `data/` 目录时给出警告。
+- App Resources 不再包含 `runtime_migration.py` 或运行时 JSON 文件。
+- 以上变更的回归测试。
+- 不改变 CLI schema、Token 总量、额度计算、模型价格或重置权益行为。
+
 ## [1.1.6] - 2026-07-22
 
 - Added official Gemini 3.6 Flash pricing support.

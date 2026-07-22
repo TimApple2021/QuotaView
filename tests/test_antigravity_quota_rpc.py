@@ -174,7 +174,11 @@ class TestAntigravityQuotaRPC(unittest.TestCase):
 
     def test_application_support_runtime_path_remains_enabled(self):
         build = Path("macos/build.sh").read_text(encoding="utf-8")
-        self.assertIn("Application Support/Antigravity Token Monitor", build)
+        scanner = Path("macos/AntigravityTokenMonitor/ScannerRunner.swift").read_text(encoding="utf-8")
+        reader = Path("macos/AntigravityTokenMonitor/TokenCacheReader.swift").read_text(encoding="utf-8")
+        self.assertIn("TokenRuntimePaths.appSupportDirectory.path", scanner)
+        self.assertIn('appendingPathComponent("Antigravity Token Monitor"', reader)
+        self.assertNotIn("runtime_migration.py", build)
 
 
 if __name__ == "__main__":

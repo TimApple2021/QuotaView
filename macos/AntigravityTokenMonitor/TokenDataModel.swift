@@ -513,6 +513,10 @@ class TokenDataModel: ObservableObject {
     private var timer: Timer?
     private var isLoadingSettings = false
     private var isEditingPrice = false
+    // Incremented on the main actor whenever a new local-cache load starts.
+    // Historical model extraction runs in the background; older results must
+    // never replace a newer refresh result.
+    private var historyLoadGeneration: UInt = 0
 
     // Model options for selection
     var modelOptions: [ModelFilterOption] {
@@ -727,11 +731,7 @@ class TokenDataModel: ObservableObject {
         case .days30Total: menuBarText = fmt(ss.last30.identifiableTokens)
         case .allTotal:   menuBarText = fmt(ss.allTime.identifiableTokens)
         case .allCost:
-            if selectedSource == .codex {
-                menuBarText = "\(String(format: "%.2f", ss.allTime.estimatedCost)) C"
-            } else {
-                menuBarText = "$\(String(format: "%.2f", ss.allTime.estimatedCost))"
-            }
+            menuBarText = "$\(String(format: "%.2f", ss.allTime.estimatedCost))"
         }
     }
 
@@ -761,15 +761,28 @@ class TokenDataModel: ObservableObject {
         let dash = TokenCacheReader.loadDashboard()
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
+            self.historyLoadGeneration &+= 1
+            let generation = self.historyLoadGeneration
             if let error = TokenCacheReader.lastError {
                 self.scanError = "数据读取失败：\(error)"
                 return
             }
             self.dashboard = dash
-            self.historicalModelIdsBySource = TokenCacheReader.loadHistoricalModelIds()
             self.normalizeSelectedModelFilter()
             self.scanError = nil
             self.updateMenuBarText()
+
+            // daily_history.json can be tens of megabytes. Keep file I/O,
+            // JSON parsing, extraction, and de-duplication off the main queue.
+            DispatchQueue.global(qos: .utility).async { [weak self] in
+                let historicalModelIds = TokenCacheReader.loadHistoricalModelIds()
+                DispatchQueue.main.async {
+                    guard let self,
+                          self.historyLoadGeneration == generation else { return }
+                    self.historicalModelIdsBySource = historicalModelIds
+                    self.normalizeSelectedModelFilter()
+                }
+            }
         }
     }
 

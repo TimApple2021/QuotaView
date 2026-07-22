@@ -99,6 +99,54 @@ struct QuotaViewPalette {
     }
 }
 
+
+
+// A Menu-based settings control opens from its label anchor instead of
+// repositioning the popup around the currently selected row, which is
+// especially important for a menu-bar window near the top of the screen.
+struct StableSettingsMenu<Option: Hashable & Identifiable>: View {
+    @Binding var selection: Option
+    let options: [Option]
+    let title: (Option) -> String
+    let width: CGFloat
+
+    init(selection: Binding<Option>, options: [Option], width: CGFloat = 150,
+         title: @escaping (Option) -> String) {
+        self._selection = selection
+        self.options = options
+        self.width = width
+        self.title = title
+    }
+
+    var body: some View {
+        Menu {
+            ForEach(options) { option in
+                Button {
+                    selection = option
+                } label: {
+                    HStack {
+                        Text(title(option))
+                        Spacer()
+                        if selection == option {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            Text(title(selection))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .frame(width: width, height: 28, alignment: .trailing)
+                .contentShape(Rectangle())
+        }
+        .menuIndicator(.hidden)
+        .menuStyle(.borderlessButton)
+        .frame(width: width, height: 28, alignment: .trailing)
+        .accessibilityValue(title(selection))
+    }
+}
+
 // MARK: - MenuBarView
 
 struct MenuBarView: View {
@@ -786,42 +834,57 @@ struct MenuBarView: View {
                     // Display & Behaviour
                     settingsGroup {
                         settingRow(dataModel.tr("菜单栏显示", "Menu Bar Display")) {
-                            Picker("", selection: $dataModel.menuBarDisplay) {
-                                ForEach(MenuBarDisplay.allCases) { Text(dataModel.menuBarDisplayLabel($0)).tag($0) }
-                            }.pickerStyle(.menu).labelsHidden().frame(maxWidth: 140)
+                            StableSettingsMenu(
+                                selection: $dataModel.menuBarDisplay,
+                                options: Array(MenuBarDisplay.allCases),
+                                width: 160,
+                                title: dataModel.menuBarDisplayLabel
+                            )
                         }
                         Divider()
                         settingRow(dataModel.tr("显示来源", "Displayed Sources")) {
-                            Picker("", selection: $dataModel.displayedSources) {
-                                ForEach(DisplayedSources.allCases) { value in
-                                    Text(dataModel.displayedSourcesLabel(value)).tag(value)
-                                }
-                            }.pickerStyle(.menu).labelsHidden().frame(maxWidth: 140)
+                            StableSettingsMenu(
+                                selection: $dataModel.displayedSources,
+                                options: Array(DisplayedSources.allCases),
+                                width: 205,
+                                title: dataModel.displayedSourcesLabel
+                            )
                         }
                         Divider()
                         settingRow(dataModel.tr("主页面默认范围", "Main Page Default Range")) {
-                            Picker("", selection: $dataModel.selectedRange) {
-                                ForEach(TimeRange.allCases) { Text(dataModel.timeRangeLabel($0)).tag($0) }
-                            }.pickerStyle(.menu).labelsHidden().frame(maxWidth: 140)
+                            StableSettingsMenu(
+                                selection: $dataModel.selectedRange,
+                                options: Array(TimeRange.allCases),
+                                width: 145,
+                                title: dataModel.timeRangeLabel
+                            )
                         }
                         Divider()
                         settingRow(dataModel.tr("自动刷新", "Auto Refresh")) {
-                            Picker("", selection: $dataModel.refreshInterval) {
-                                ForEach(RefreshInterval.allCases) { Text(dataModel.refreshIntervalLabel($0)).tag($0) }
-                            }.pickerStyle(.menu).labelsHidden().frame(maxWidth: 140)
+                            StableSettingsMenu(
+                                selection: $dataModel.refreshInterval,
+                                options: Array(RefreshInterval.allCases),
+                                width: 128,
+                                title: dataModel.refreshIntervalLabel
+                            )
                         }
                         Divider()
                         settingRow(dataModel.tr("外观主题", "Appearance")) {
-                            Picker("", selection: $dataModel.theme) {
-                                ForEach(AppTheme.allCases) { Text(dataModel.themeLabel($0)).tag($0) }
-                            }.pickerStyle(.menu).labelsHidden().frame(maxWidth: 140)
+                            StableSettingsMenu(
+                                selection: $dataModel.theme,
+                                options: Array(AppTheme.allCases),
+                                width: 138,
+                                title: dataModel.themeLabel
+                            )
                         }
                         Divider()
                         settingRow(dataModel.tr("语言", "Language")) {
-                            Picker("", selection: $dataModel.language) {
-                                Text("中文").tag(AppLanguage.chinese)
-                                Text("English").tag(AppLanguage.english)
-                            }.pickerStyle(.menu).labelsHidden().frame(maxWidth: 140)
+                            StableSettingsMenu(
+                                selection: $dataModel.language,
+                                options: [.chinese, .english],
+                                width: 110,
+                                title: { $0 == .chinese ? "中文" : "English" }
+                            )
                         }
                     }
 

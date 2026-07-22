@@ -14,8 +14,8 @@ def test_language_setting_is_persisted_and_has_two_options():
     assert 'case chinese = "中文"' in MODEL
     assert 'case english = "English"' in MODEL
     assert 'forKey: "language"' in MODEL
-    assert 'Text("中文").tag(AppLanguage.chinese)' in VIEW
-    assert 'Text("English").tag(AppLanguage.english)' in VIEW
+    assert 'options: [.chinese, .english]' in VIEW
+    assert 'title: { $0 == .chinese ? "中文" : "English" }' in VIEW
 
 
 def test_main_ui_has_bilingual_localization_entries():
@@ -33,4 +33,4 @@ def test_readme_is_bilingual():
 
 
 def test_release_build_version_is_bumped():
-    assert 'VERSION="1.1.6"' in BUILD
+    assert 'VERSION="1.1.7"' in BUILD
