@@ -46,6 +46,19 @@ DEFAULT_SETTINGS = {
             "actual_billing_confirmed": False,
             "raw_model_id": "gemini-3.5-flash"
         },
+        "gemini-3.6-flash": {
+            "display_name": "Gemini 3.6 Flash",
+            "provider": "Google",
+            "input_price_per_million": 1.50,
+            "output_price_per_million": 7.50,
+            "cached_input_price_per_million": 0.15,
+            "pricing_profile": "api_standard_equivalent",
+            "pricing_source": "Google Gemini API official pricing",
+            "pricing_verified_at": "2026-07-22",
+            "user_overridden": False,
+            "actual_billing_confirmed": False,
+            "raw_model_id": "gemini-3.6-flash"
+        },
         "gemini-3.1-pro": {
             "display_name": "Gemini 3.1 Pro",
             "provider": "Google",
@@ -246,30 +259,91 @@ def scan_lock():
             handle.close()
 
 ANTIGRAVITY_CURRENT_MODEL_ORDER = [
-    "claude-opus-4-6-thinking", "claude-sonnet-4-6", "gemini-3.5-flash",
-    "gemini-3.1-pro", "gpt-oss-120b"
+    "claude-opus-4-6-thinking", "claude-sonnet-4-6", "gemini-3.6-flash",
+    "gemini-3.5-flash", "gemini-3.1-pro",
+    "gpt-oss-120b"
 ]
 CODEX_CURRENT_MODEL_ORDER = ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5"]
 
-def normalize_antigravity_model(model_id):
-    """Normalize provider display variants without changing legacy ledger IDs."""
+GEMINI_35_USER_SETTINGS = {
+    "gemini 3.5 flash", "gemini 3.5 flash (low)",
+    "gemini 3.5 flash (medium)", "gemini 3.5 flash (high)",
+}
+
+GEMINI_36_MODEL_VARIANTS = {
+    "gemini-3.6-flash", "gemini-3.6-flash-low", "gemini-3.6-flash-medium",
+    "gemini-3.6-flash-high", "gemini 3.6 flash", "gemini 3.6 flash (low)",
+    "gemini 3.6 flash (medium)", "gemini 3.6 flash (high)",
+}
+
+
+def antigravity_model_mapping(model_id, user_setting=None):
+    """Return canonical mapping metadata without guessing internal IDs."""
     value = str(model_id or "").strip().lower()
+    setting = str(user_setting or "").strip().lower()
+    if value == "gemini-3-flash-c":
+        if setting in GEMINI_35_USER_SETTINGS:
+            return {"normalized_model_id": "gemini-3.5-flash",
+                    "mapping_source": "raw_id_plus_user_setting",
+                    "mapping_confidence": "observed", "mapping_conflict": False,
+                    "internal_or_unmapped": False}
+        return {"normalized_model_id": str(model_id or "unknown_legacy"),
+                "mapping_source": "raw_id", "mapping_confidence": "unmapped",
+                "mapping_conflict": bool(setting), "internal_or_unmapped": True}
+    if value in GEMINI_36_MODEL_VARIANTS:
+        return {"normalized_model_id": "gemini-3.6-flash",
+                "mapping_source": "canonical_alias", "mapping_confidence": "high",
+                "mapping_conflict": False, "internal_or_unmapped": False}
     if value in {"gemini-3.5-flash", "gemini-3.5-flash-low", "gemini-3.5-flash-medium", "gemini-3.5-flash-high",
                  "gemini 3.5 flash", "gemini 3.5 flash (low)", "gemini 3.5 flash (medium)", "gemini 3.5 flash (high)"}:
-        return "gemini-3.5-flash"
+        normalized = "gemini-3.5-flash"
+        return {"normalized_model_id": normalized, "mapping_source": "canonical_alias",
+                "mapping_confidence": "high", "mapping_conflict": False,
+                "internal_or_unmapped": False}
     if value in {"gemini-3.1-pro", "gemini-3.1-pro-low", "gemini-3.1-pro-high",
                  "gemini 3.1 pro", "gemini 3.1 pro (low)", "gemini 3.1 pro (high)"}:
-        return "gemini-3.1-pro"
+        normalized = "gemini-3.1-pro"
+        return {"normalized_model_id": normalized, "mapping_source": "canonical_alias",
+                "mapping_confidence": "high", "mapping_conflict": False,
+                "internal_or_unmapped": False}
     if value in {"claude-sonnet-4-6", "claude sonnet 4.6", "claude sonnet 4.6 (thinking)"}:
-        return "claude-sonnet-4-6"
+        normalized = "claude-sonnet-4-6"
+        return {"normalized_model_id": normalized, "mapping_source": "canonical_alias",
+                "mapping_confidence": "high", "mapping_conflict": False,
+                "internal_or_unmapped": False}
     if value in {"claude-opus-4-6-thinking", "claude opus 4.6", "claude opus 4.6 (thinking)"}:
-        return "claude-opus-4-6-thinking"
+        normalized = "claude-opus-4-6-thinking"
+        return {"normalized_model_id": normalized, "mapping_source": "canonical_alias",
+                "mapping_confidence": "high", "mapping_conflict": False,
+                "internal_or_unmapped": False}
     if value in {"gpt-oss-120b", "gpt-oss 120b", "gpt-oss 120b (medium)"}:
-        return "gpt-oss-120b"
+        normalized = "gpt-oss-120b"
+        return {"normalized_model_id": normalized, "mapping_source": "canonical_alias",
+                "mapping_confidence": "high", "mapping_conflict": False,
+                "internal_or_unmapped": False}
     # Preserve the accepted historical key so existing totals do not move.
     if value in {"gemini-3-flash-a", "gemini-3-flash-agent", "gemini-default"}:
-        return "gemini-3-flash-a"
-    return str(model_id or "unknown_legacy")
+        normalized = "gemini-3-flash-a"
+        return {"normalized_model_id": normalized, "mapping_source": "legacy_alias",
+                "mapping_confidence": "high", "mapping_conflict": False,
+                "internal_or_unmapped": False}
+    return {"normalized_model_id": str(model_id or "unknown_legacy"),
+            "mapping_source": "raw_id", "mapping_confidence": "unmapped",
+            "mapping_conflict": False, "internal_or_unmapped": True}
+
+
+def normalize_antigravity_model(model_id, user_setting=None):
+    """Normalize provider variants; raw internal IDs require evidence."""
+    return antigravity_model_mapping(model_id, user_setting)["normalized_model_id"]
+
+
+def resolve_historical_antigravity_model(model_id, discovered_models=None):
+    """Use only previously observed evidence for raw historical aliases."""
+    raw_id = str(model_id or "unknown_legacy")
+    record = (discovered_models or {}).get(raw_id, {}) if isinstance(discovered_models, dict) else {}
+    if isinstance(record, dict) and not record.get("internal_or_unmapped", True):
+        return record.get("normalized_model_id") or raw_id
+    return normalize_antigravity_model(raw_id)
 
 
 def pricing_model_id(model_id):
@@ -316,26 +390,12 @@ def dynamic_model_options(summary, model_prices):
     return options
 
 def settings_model_ids(source_key, model_prices, daily_history, dashboard_sources):
-    """Build the settings catalog from cumulative sources, never a range summary."""
-    ids = set()
-    for day in (daily_history or {}).get("days", []):
-        ids.update((((day.get("sources") or {}).get(source_key) or {}).get("models") or {}).keys())
-    source = (dashboard_sources or {}).get(source_key) or {}
-    ids.update((((source.get("all_time") or {}).get("models") or {}).keys()))
+    """Return the fixed editable price catalog, independent of history."""
     if source_key == "codex":
         # The client selector is the authoritative current list. Legacy prices
         # remain in settings for historical cost calculation but stay hidden.
         return list(CODEX_CURRENT_MODEL_ORDER)
-    ordered = []
-    for model_id in ANTIGRAVITY_CURRENT_MODEL_ORDER:
-        if model_id not in ordered:
-            ordered.append(model_id)
-    for model_id in sorted(ids):
-        if model_id in {"unknown_legacy", "gemini-default", "gemini-3-flash-a", "codex-auto-review"}:
-            continue
-        if model_id not in ordered:
-            ordered.append(model_id)
-    return ordered
+    return list(ANTIGRAVITY_CURRENT_MODEL_ORDER)
 
 def credits_display_state(summary, model_prices):
     """Return (text, note) for the Credits card without confusing unpriced with zero."""
@@ -383,7 +443,7 @@ def load_settings():
                     merged["model_prices"] = prices
                     new_model_defaults_added = (
                         any(k not in loaded["model_prices"] for k in (
-                            "gemini-3.5-flash", "gemini-3.1-pro", "gpt-oss-120b", "gpt-5.6-terra", "gpt-5.5")) or
+                            "gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.1-pro", "gpt-oss-120b", "gpt-5.6-terra", "gpt-5.5")) or
                         any(k not in loaded["model_prices"].get("gemini-3.1-pro", {}) for k in (
                             "threshold_tokens", "standard", "long_context"))
                     )
@@ -748,7 +808,8 @@ def parse_sqlite_convo(db_path, cid):
                 continue
             
             raw_model_id = model_literal or MODEL_ENUM_MAP.get(model_enum, "unknown_legacy")
-            normalized_model_id = normalize_antigravity_model(raw_model_id)
+            mapping = antigravity_model_mapping(raw_model_id, user_setting)
+            normalized_model_id = mapping["normalized_model_id"]
                 
             display_model_name = user_setting or ""
             if not display_model_name:
@@ -762,6 +823,8 @@ def parse_sqlite_convo(db_path, cid):
                     display_model_name = "Claude Opus 4.6"
                 elif normalized_model_id == "gpt-oss-120b":
                     display_model_name = "GPT-OSS 120B"
+                elif normalized_model_id == "gemini-3.6-flash":
+                    display_model_name = "Gemini 3.6 Flash"
                 else:
                     display_model_name = "未映射模型"
                     
@@ -776,6 +839,10 @@ def parse_sqlite_convo(db_path, cid):
                 "timestamp": final_ts,
                 "raw_model_id": raw_model_id,
                 "normalized_model_id": normalized_model_id,
+                "mapping_source": mapping["mapping_source"],
+                "mapping_confidence": mapping["mapping_confidence"],
+                "mapping_conflict": mapping["mapping_conflict"],
+                "internal_or_unmapped": mapping["internal_or_unmapped"],
                 "display_model_name": display_model_name,
                 "input_tokens": input_tokens,
                 "output_tokens": output_tokens
@@ -1236,6 +1303,7 @@ def scan_conversations():
     Uses modified-time, size, and content MD5 hash caching to parse efficiently.
     Returns: conversations, codex_calls, codex_auth_info, scanner_stats
     """
+    import copy
     settings = load_settings()
     system_prompt_tokens = settings.get("system_prompt_tokens", 0)
     model_prices = settings.get("model_prices", DEFAULT_SETTINGS["model_prices"])
@@ -1384,13 +1452,42 @@ def scan_conversations():
     # Codex scan integration
     codex_calls, codex_auth_info, codex_stats = scan_codex_conversations(settings, cache)
 
-    # Dynamic registration of newly discovered models
-    all_discovered_models = set()
-    for cid, convo in conversations.items():
+    # Enrich cached calls as well as freshly parsed calls, then record raw-ID
+    # mapping evidence separately from the editable price catalog.
+    original_discovered_models = copy.deepcopy(settings.get("discovered_models", {}))
+    discovered_models = copy.deepcopy(original_discovered_models)
+    if not isinstance(discovered_models, dict):
+        discovered_models = {}
+    for convo in conversations.values():
         for call in convo.get("model_calls", []):
-            all_discovered_models.add(call["normalized_model_id"])
-            
+            mapping = antigravity_model_mapping(call.get("raw_model_id"), call.get("display_model_name"))
+            call["normalized_model_id"] = mapping["normalized_model_id"]
+            call["mapping_source"] = mapping["mapping_source"]
+            call["mapping_confidence"] = mapping["mapping_confidence"]
+            call["mapping_conflict"] = mapping["mapping_conflict"]
+            call["internal_or_unmapped"] = mapping["internal_or_unmapped"]
+            raw_id = str(call.get("raw_model_id") or "unknown_legacy")
+            record = discovered_models.get(raw_id, {})
+            if not isinstance(record, dict):
+                record = {}
+            if mapping["mapping_conflict"]:
+                record["mapping_conflict_count"] = max(int(record.get("mapping_conflict_count", 0)), 1)
+            record.update({
+                "raw_model_id": raw_id,
+                "normalized_model_id": mapping["normalized_model_id"],
+                "mapping_source": mapping["mapping_source"],
+                "mapping_confidence": mapping["mapping_confidence"],
+                "internal_or_unmapped": mapping["internal_or_unmapped"],
+            })
+            discovered_models[raw_id] = record
+
     settings_updated = False
+    for canonical_id in ("gemini-3.6-flash",):
+        if canonical_id in DEFAULT_SETTINGS["model_prices"] and not model_prices.get(canonical_id, {}).get("user_overridden", False):
+            official = DEFAULT_SETTINGS["model_prices"][canonical_id]
+            if model_prices.get(canonical_id) != official:
+                model_prices[canonical_id] = dict(official)
+                settings_updated = True
     # Force standard tier for calculation, but keep settings value as is for compatibility
     tier = "standard"
     gem = model_prices.get("gemini-3-flash-a")
@@ -1402,20 +1499,8 @@ def scan_conversations():
         if any(gem.get(k) != v for k, v in tier_prices.items()):
             gem.update(tier_prices)
             settings_updated = True
-    for mid in all_discovered_models:
-        if mid not in model_prices:
-            model_prices[mid] = {
-                "display_name": mid,
-                "provider": "Unknown",
-                "input_price_per_million": 0.0,
-                "output_price_per_million": 0.0,
-                "pricing_profile": "api_standard_equivalent",
-                "pricing_source": "unmapped",
-                "pricing_verified_at": datetime.now().strftime("%Y-%m-%d"),
-                "user_overridden": False,
-                "actual_billing_confirmed": False
-            }
-            settings_updated = True
+    if discovered_models != original_discovered_models:
+        settings_updated = True
             
     for call in codex_calls:
         mid = call["normalized_model_id"]
@@ -1453,6 +1538,7 @@ def scan_conversations():
             
     if settings_updated:
         settings["model_prices"] = model_prices
+        settings["discovered_models"] = discovered_models
         save_settings(settings)
 
     # Save updated cache
@@ -2255,6 +2341,7 @@ def _get_aggregated_stats_unlocked():
         convos, codex_calls, codex_auth_info, scanner_stats = scan_result
     settings = load_settings()
     model_prices = settings.get("model_prices", DEFAULT_SETTINGS["model_prices"])
+    discovered_models = settings.get("discovered_models", {})
     # Remove the earlier guessed Codex mapping/rates while preserving its
     # token and call totals under the observed raw model.
     pricing_changed = False
@@ -2490,7 +2577,7 @@ def _get_aggregated_stats_unlocked():
                 # Historical Antigravity ledgers may contain the raw alias
                 # gemini-default. Keep the ledger untouched, but expose one
                 # canonical model in every dashboard range.
-                summary_mid = normalize_antigravity_model(mid) if src_name == "antigravity" else mid
+                summary_mid = resolve_historical_antigravity_model(mid, discovered_models) if src_name == "antigravity" else mid
                 inp = m_entry.get("input_tokens", 0)
                 cached = m_entry.get("cached_input_tokens", 0)
                 out = m_entry.get("output_tokens", 0)

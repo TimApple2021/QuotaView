@@ -64,7 +64,7 @@ class TestQuotaViewCLI(unittest.TestCase):
         d = dashboard(); d["quota_status"]["codex"]["reset_entitlements"]["items"] = [{"status": "available", "display_name": "Full reset"}, {"status": "used"}]; self.assertEqual(len(cli.reset_data(d)["items"]), 1)
     def test_prices_current_models(self): self.assertEqual(len(cli.prices_data("codex", json.loads((cli.RUNTIME_DIR / "settings.json").read_text()), False)), 4)
     def test_prices_legacy_models(self): self.assertEqual(len(cli.prices_data("codex", json.loads((cli.RUNTIME_DIR / "settings.json").read_text()), True)), 6)
-    def test_prices_tiered_gemini(self): self.assertIsNotNone(cli.prices_data("antigravity", json.loads((cli.RUNTIME_DIR / "settings.json").read_text()), False)[3]["tiered_pricing"])
+    def test_prices_tiered_gemini(self): self.assertIsNotNone(cli.prices_data("antigravity", json.loads((cli.RUNTIME_DIR / "settings.json").read_text()), False)[4]["tiered_pricing"])
     def test_prices_unpriced_oss(self): self.assertTrue(cli.prices_data("antigravity", json.loads((cli.RUNTIME_DIR / "settings.json").read_text()), False)[4]["unpriced"])
     def test_dashboard_missing(self):
         (cli.RUNTIME_DIR / "dashboard.json").unlink(); code, out = self.run_main("status", "--json"); self.assertEqual(code, 3); self.assertFalse(json.loads(out)["ok"])

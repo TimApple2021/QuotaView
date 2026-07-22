@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.1.6] - 2026-07-22
+
+- Added official Gemini 3.6 Flash pricing support.
+- Normalized Gemini 3.5 and 3.6 Flash Low, Medium, and High reasoning levels into one canonical model entry per model.
+- Added evidence-based conditional mapping for Antigravity's internal `gemini-3-flash-c` identifier when it corresponds to Gemini 3.5 Flash.
+- Prevented unknown runtime model identifiers from automatically appearing as editable official pricing entries.
+- Preserved raw model identifiers and historical token totals for diagnostics and traceability.
+- Expanded CLI doctor diagnostics and regression coverage.
+- No changes to the CLI schema, token totals, quota calculations, or reset entitlement behavior.
+
+### v1.1.6（中文）
+
+- 增加 Gemini 3.6 Flash 正式价格支持。
+- 将 Gemini 3.5 和 3.6 Flash 的 Low、Medium、High 思考等级分别归一为一个 canonical 模型项。
+- 增加基于证据的 `gemini-3-flash-c` 条件映射；仅在对应 Gemini 3.5 Flash 时映射。
+- 防止未知运行时模型 ID 自动进入可编辑的正式价格目录。
+- 保留原始模型 ID 和历史 Token 总量，用于诊断和追溯。
+- 扩展 CLI doctor 诊断和回归测试覆盖。
+- 不改变 CLI schema、Token 总量、额度计算或重置权益行为。
+
 ## [1.1.5] - 2026-07-20
 
 - Fixed an inconsistency where the reset badge could show an available reset while the entitlement list appeared empty.

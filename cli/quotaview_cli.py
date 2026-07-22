@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 
 SCHEMA_VERSION = 1
-CLI_VERSION = "1.1.5"
+CLI_VERSION = "1.1.6"
 APP_PATH = Path("/Applications/QuotaView.app")
 BUNDLE_BACKEND = APP_PATH / "Contents/Resources/monitor_backend.py"
 BUNDLE_CLI = APP_PATH / "Contents/Resources/quotaview_cli.py"
@@ -27,7 +27,7 @@ try:
 except OSError:
     pass
 
-CURRENT_AG = ["claude-opus-4-6-thinking", "claude-sonnet-4-6", "gemini-3.5-flash", "gemini-3.1-pro", "gpt-oss-120b"]
+CURRENT_AG = ["claude-opus-4-6-thinking", "claude-sonnet-4-6", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.1-pro", "gpt-oss-120b"]
 CURRENT_CODEX = ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5"]
 LEGACY_CODEX = ["gpt-5.4", "gpt-5.4-mini"]
 
@@ -136,7 +136,7 @@ def prices_data(source, settings, include_legacy):
     output = []
     for model_id in ids:
         p = prices.get(model_id, {})
-        row = {"raw_model_id": model_id, "display_name": p.get("display_name", model_id), "user_overridden": bool(p.get("user_overridden", False)), "pricing_profile": p.get("pricing_profile"), "pricing_source": p.get("pricing_source"), "pricing_verified_at": p.get("pricing_verified_at"), "tiered_pricing": {"threshold_tokens": p.get("threshold_tokens"), "standard": p.get("standard"), "long_context": p.get("long_context")} if p.get("threshold_tokens") else None, "unpriced": p.get("pricing_profile") == "unpriced" or (not p.get("input_price_per_million") and not p.get("output_price_per_million"))}
+        row = {"raw_model_id": model_id, "normalized_model_id": model_id, "mapping_source": "canonical_catalog", "mapping_confidence": "high", "internal_or_unmapped": False, "mapping_conflict_count": 0, "display_name": p.get("display_name", model_id), "user_overridden": bool(p.get("user_overridden", False)), "pricing_profile": p.get("pricing_profile"), "pricing_source": p.get("pricing_source"), "pricing_verified_at": p.get("pricing_verified_at"), "tiered_pricing": {"threshold_tokens": p.get("threshold_tokens"), "standard": p.get("standard"), "long_context": p.get("long_context")} if p.get("threshold_tokens") else None, "unpriced": p.get("pricing_profile") == "unpriced" or (not p.get("input_price_per_million") and not p.get("output_price_per_million"))}
         if row["unpriced"]:
             row["display_price"] = "未定价"
             if model_id == "gpt-oss-120b":
@@ -153,11 +153,13 @@ def prices_data(source, settings, include_legacy):
 def resolved_pricing_data(source, dashboard, settings):
     """Read-only audit of the prices actually resolved for today's models."""
     prices = settings.get("model_prices", {})
+    discovered = settings.get("discovered_models", {})
     rows = []
     for name in source_names(source):
         today = dashboard.get("sources", {}).get(name, {}).get("today", {})
         for model_id, metrics in (today.get("models", {}) or {}).items():
-            canonical = "gemini-3-flash-a" if model_id == "gemini-default" else model_id
+            record = discovered.get(model_id, {}) if isinstance(discovered, dict) else {}
+            canonical = record.get("normalized_model_id") if isinstance(record, dict) and not record.get("internal_or_unmapped", True) else ("gemini-3-flash-a" if model_id == "gemini-default" else model_id)
             price = prices.get(canonical, {})
             inp = int(metrics.get("user_input_tokens", 0))
             cached = int(metrics.get("cached_input_tokens", 0))
@@ -167,6 +169,10 @@ def resolved_pricing_data(source, dashboard, settings):
                 "source": name,
                 "raw_model_id": model_id,
                 "normalized_model_id": canonical,
+                "mapping_source": record.get("mapping_source", "legacy_alias" if model_id == "gemini-default" else "dashboard_canonical") if isinstance(record, dict) else "dashboard_canonical",
+                "mapping_confidence": record.get("mapping_confidence", "high") if isinstance(record, dict) else "high",
+                "internal_or_unmapped": bool(record.get("internal_or_unmapped", False)) if isinstance(record, dict) else False,
+                "mapping_conflict_count": int(record.get("mapping_conflict_count", 0)) if isinstance(record, dict) else 0,
                 "display_name": price.get("display_name", model_id),
                 "input_tokens": inp,
                 "cached_input_tokens": cached,
@@ -234,7 +240,10 @@ def refresh(args):
 def doctor_data():
     lock = RUNTIME_DIR / "scan.lock"
     ps = subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True).stdout.splitlines()
-    backend_processes = [line.strip() for line in ps if "monitor_backend.py" in line and "quotaview_cli.py" not in line]
+    backend_processes = [line.strip() for line in ps
+                         if "monitor_backend.py" in line
+                         and "quotaview_cli.py" not in line
+                         and "python" in line]
     dashboard_ok = settings_ok = False
     try:
         load_json("dashboard.json"); dashboard_ok = True
@@ -242,7 +251,14 @@ def doctor_data():
     try:
         load_json("settings.json"); settings_ok = True
     except CLIError: pass
-    return {"app_bundle": {"path": str(APP_PATH), "exists": APP_PATH.exists()}, "resources": {"monitor_backend": BUNDLE_BACKEND.exists(), "cli": BUNDLE_CLI.exists()}, "global_command": {"path": shutil.which("quotaview")}, "runtime": {"path": str(RUNTIME_DIR), "exists": RUNTIME_DIR.exists(), "readable": os.access(RUNTIME_DIR, os.R_OK), "writable": os.access(RUNTIME_DIR, os.W_OK), "dashboard_valid": dashboard_ok, "settings_valid": settings_ok}, "official_live": quota_data("all", load_json("dashboard.json")) if dashboard_ok else {}, "codex_reset_entitlements": reset_data(load_json("dashboard.json")) if dashboard_ok else {}, "cli_version": CLI_VERSION, "scan_lock": {"path": str(lock), "exists": lock.exists()}, "monitor_backend_processes": backend_processes, "abnormal_residual_scan_processes": []}
+    settings = load_json("settings.json") if settings_ok else {}
+    discovered = settings.get("discovered_models", {}) if isinstance(settings, dict) else {}
+    safe_discovered = []
+    for raw_id, record in discovered.items() if isinstance(discovered, dict) else []:
+        if not isinstance(record, dict):
+            continue
+        safe_discovered.append({"raw_model_id": raw_id, "normalized_model_id": record.get("normalized_model_id", raw_id), "mapping_source": record.get("mapping_source"), "mapping_confidence": record.get("mapping_confidence"), "internal_or_unmapped": bool(record.get("internal_or_unmapped", True)), "mapping_conflict_count": int(record.get("mapping_conflict_count", 0))})
+    return {"app_bundle": {"path": str(APP_PATH), "exists": APP_PATH.exists()}, "resources": {"monitor_backend": BUNDLE_BACKEND.exists(), "cli": BUNDLE_CLI.exists()}, "global_command": {"path": shutil.which("quotaview")}, "runtime": {"path": str(RUNTIME_DIR), "exists": RUNTIME_DIR.exists(), "readable": os.access(RUNTIME_DIR, os.R_OK), "writable": os.access(RUNTIME_DIR, os.W_OK), "dashboard_valid": dashboard_ok, "settings_valid": settings_ok}, "official_live": quota_data("all", load_json("dashboard.json")) if dashboard_ok else {}, "codex_reset_entitlements": reset_data(load_json("dashboard.json")) if dashboard_ok else {}, "model_mapping": {"discovered_models": safe_discovered, "mapping_conflict_count": sum(item["mapping_conflict_count"] for item in safe_discovered)}, "cli_version": CLI_VERSION, "scan_lock": {"path": str(lock), "exists": lock.exists()}, "monitor_backend_processes": backend_processes, "abnormal_residual_scan_processes": []}
 
 
 def build_parser():

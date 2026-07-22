@@ -182,6 +182,19 @@ class TokenDataModel: ObservableObject {
             userOverridden: false,
             actualBillingConfirmed: false
         ),
+        "gemini-3.6-flash": ModelPriceDetail(
+            displayName: "Gemini 3.6 Flash",
+            provider: "Google",
+            inputPricePerMillion: 1.50,
+            outputPricePerMillion: 7.50,
+            cachedInputPricePerMillion: 0.15,
+            rawModelId: "gemini-3.6-flash",
+            pricingProfile: "api_standard_equivalent",
+            pricingSource: "Google Gemini API official pricing",
+            pricingVerifiedAt: "2026-07-22",
+            userOverridden: false,
+            actualBillingConfirmed: false
+        ),
         "gemini-3.1-pro": ModelPriceDetail(
             displayName: "Gemini 3.1 Pro",
             provider: "Google",
@@ -524,6 +537,7 @@ class TokenDataModel: ObservableObject {
     private func displayName(for model: String) -> String {
         switch model {
         case "gemini-3.5-flash", "gemini-3-flash-a": return "Gemini 3.5 Flash"
+        case "gemini-3.6-flash": return "Gemini 3.6 Flash"
         case "gemini-3.1-pro": return "Gemini 3.1 Pro"
         case "gpt-oss-120b": return "GPT-OSS 120B"
         case "gpt-5.6-luna": return "GPT-5.6 Luna"
@@ -541,16 +555,12 @@ class TokenDataModel: ObservableObject {
     /// Settings-page catalog: cumulative history + dashboard all-time + the
     /// registered settings directory. This intentionally does not use currentStats.
     func settingsModelKeys(for source: AISource) -> [String] {
-        var ids = historicalModelIdsBySource[source.jsonKey] ?? []
-        ids.formUnion(Array(dashboard.sources[source.jsonKey]?.allTime.models?.keys ?? Dictionary<String, TokenSummary>().keys))
+        // Hidden legacy IDs: "unknown_legacy", "codex-auto-review", "gemini-default".
+        // They remain in history/doctor, but never become editable price rows.
         let current = source == .codex
             ? ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5"]
-            : ["claude-opus-4-6-thinking", "claude-sonnet-4-6", "gemini-3.5-flash", "gemini-3.1-pro", "gpt-oss-120b"]
-        var result = current
-        for key in ids.sorted() where !["unknown_legacy", "codex-auto-review", "gemini-default", "gemini-3-flash-a", "gpt-5.4", "gpt-5.4-mini"].contains(key) {
-            if !result.contains(key) { result.append(key) }
-        }
-        return result
+            : ["claude-opus-4-6-thinking", "claude-sonnet-4-6", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.1-pro", "gpt-oss-120b"]
+        return current
     }
 
     func modelPriceDetail(for key: String, source: AISource) -> ModelPriceDetail {

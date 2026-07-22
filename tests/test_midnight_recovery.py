@@ -73,7 +73,7 @@ class TestMidnightRecovery(unittest.TestCase):
     def test_16_antigravity_catalog_is_independent(self):
         daily = {"days": [{"sources": {"antigravity": {"models": {"gemini": {}}}, "codex": {"models": {"gpt": {}}}}}]}
         self.assertEqual(m.settings_model_ids("antigravity", {}, daily, {}),
-                         ["claude-opus-4-6-thinking", "claude-sonnet-4-6", "gemini-3.5-flash", "gemini-3.1-pro", "gpt-oss-120b", "gemini"])
+                         ["claude-opus-4-6-thinking", "claude-sonnet-4-6", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.1-pro", "gpt-oss-120b"])
 
 
 if __name__ == "__main__":

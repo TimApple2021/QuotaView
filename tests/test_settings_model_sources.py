@@ -39,7 +39,7 @@ class TestSettingsModelSources(unittest.TestCase):
 
     def test_empty_state_only_when_all_sources_are_empty(self):
         self.assertEqual(m.settings_model_ids("antigravity", {}, {"days": []}, {}),
-                         ["claude-opus-4-6-thinking", "claude-sonnet-4-6", "gemini-3.5-flash", "gemini-3.1-pro", "gpt-oss-120b"])
+                         ["claude-opus-4-6-thinking", "claude-sonnet-4-6", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.1-pro", "gpt-oss-120b"])
 
     def test_range_and_today_data_do_not_change_catalog(self):
         daily = history("gemini-3-flash-a", "gpt-5.4")

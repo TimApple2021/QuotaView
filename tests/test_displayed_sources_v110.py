@@ -108,7 +108,7 @@ def test_displayed_sources_does_not_add_token_or_cost_calculation():
 
 
 def test_readme_describes_v110_project_and_display_sources():
-    assert "v1.1.5" in README
+    assert "v1.1.6" in README
     assert "## About This Project" in README
     assert "## 关于本项目" in README_ZH
     assert "configurable display of both sources" in README
@@ -118,8 +118,8 @@ def test_readme_describes_v110_project_and_display_sources():
 def test_release_version_is_v112():
     build = (ROOT / "macos/build.sh").read_text(encoding="utf-8")
     cli = CLI
-    assert 'VERSION="1.1.5"' in build
-    assert 'CLI_VERSION = "1.1.5"' in cli
+    assert 'VERSION="1.1.6"' in build
+    assert 'CLI_VERSION = "1.1.6"' in cli
 
 
 def test_settings_picker_is_not_two_toggles():
