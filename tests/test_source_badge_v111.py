@@ -10,8 +10,9 @@ CHANGELOG = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
 
 def test_both_mode_has_no_source_badge():
-    assert "case .both: return nil" in VIEW
+    assert "case .all: return nil" in VIEW
     assert "shouldShowSourceSegment" in VIEW
+
 
 
 def test_antigravity_only_badge():
@@ -67,13 +68,15 @@ def test_badge_accessibility_labels_are_bilingual():
 
 
 def test_returning_to_both_hides_badge():
-    block = VIEW[VIEW.index("private var sourceBadgeLabel"):VIEW.index("private var dashboardPage")]
-    assert "case .both: return nil" in block
+    start = VIEW.index("private var sourceBadgeLabel:")
+    block = VIEW[start:start+200]
+    assert "case .all: return nil" in block
+
 
 
 def test_single_source_segment_remains_hidden():
     assert "if dataModel.shouldShowSourceSegment" in VIEW
-    assert "var shouldShowSourceSegment: Bool { displayedSources == .both }" in MODEL
+    assert "var shouldShowSourceSegment: Bool { displayedSources == .all }" in MODEL
 
 
 def test_single_source_settings_persist_after_restart():
@@ -84,7 +87,7 @@ def test_single_source_settings_persist_after_restart():
 
 def test_restore_defaults_removes_badge_state():
     reset = VIEW[VIEW.index("private func resetDefaults"):VIEW.index("struct RefreshButtonIcon")]
-    assert "dataModel.displayedSources = .both" in reset
+    assert "dataModel.displayedSources = .all" in reset
 
 
 def test_menu_bar_source_mapping_is_unchanged():
@@ -103,8 +106,8 @@ def test_cli_schema_remains_one():
 
 
 def test_readme_and_changelog_are_v112():
-    assert "v1.1.7" in README
+    assert "v1.1.8" in README
     assert "About This Project" in README
-    assert "## [1.1.7]" in CHANGELOG
+    assert "## v1.1.8" in CHANGELOG
     assert "compact source badge" in CHANGELOG
     assert "轻量来源标识" in CHANGELOG

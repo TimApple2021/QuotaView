@@ -96,7 +96,8 @@ class TestSegmentCostAutosave(unittest.TestCase):
 
     def test_price_edit_saves_on_submit(self):
         self.assertIn("updateModelPrice", MENU)
-        self.assertEqual(MENU.count(".onSubmit { dataModel.saveSettingsFile() }"), 3)
+        self.assertIn("private func priceColumn(label: String, value: Binding<Double>)", MENU)
+        self.assertEqual(MENU.count(".onSubmit { dataModel.saveSettingsFile() }"), 1)
 
     def test_save_failure_is_visible(self):
         self.assertIn("settingsError", MODEL)

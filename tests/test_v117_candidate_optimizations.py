@@ -1,4 +1,4 @@
-"""Regression coverage for the v1.1.7 local optimization candidate.
+"""Regression coverage for the v1.1.8 local optimization candidate.
 
 These tests use temporary files and source contracts for the Swift scheduling
 boundary. They never point the scanner at the user's Application Support data.

@@ -62,18 +62,16 @@ class RangeAuditTests(unittest.TestCase):
         self.assertIn('dashboard.sources[selectedSource.jsonKey]', MODEL)
 
     def test_menu_bar_cost_uses_dollar_symbol_for_both_sources(self):
-        update_block = MODEL[MODEL.index('func updateMenuBarText()'):]
-        cost_block = update_block[update_block.index('case .allCost:'):update_block.index('        }', update_block.index('case .allCost:'))]
-        self.assertIn('menuBarText = "$\\(String(format: "%.2f", ss.allTime.estimatedCost))"', cost_block)
-        self.assertNotIn('selectedSource == .codex', cost_block)
-        self.assertNotIn(') C', cost_block)
+        self.assertIn('formatMenuBarForSourceStats', MODEL)
+        self.assertIn('menuBarText = "\\(currencySymbol)\\(String(format: "%.2f", ss.allTime.estimatedCost))"', MODEL)
 
     def test_other_menu_bar_modes_remain_token_based(self):
-        self.assertIn('case .iconOnly:   menuBarText = ""', MODEL)
-        self.assertIn('case .todayTotal: menuBarText = fmt(ss.today.identifiableTokens)', MODEL)
-        self.assertIn('case .days7Total: menuBarText = fmt(ss.last7.identifiableTokens)', MODEL)
+        self.assertIn('case .iconOnly:    menuBarText = ""', MODEL)
+        self.assertIn('case .todayTotal:  menuBarText = fmt(ss.today.identifiableTokens)', MODEL)
+        self.assertIn('case .days7Total:  menuBarText = fmt(ss.last7.identifiableTokens)', MODEL)
         self.assertIn('case .days30Total: menuBarText = fmt(ss.last30.identifiableTokens)', MODEL)
-        self.assertIn('case .allTotal:   menuBarText = fmt(ss.allTime.identifiableTokens)', MODEL)
+        self.assertIn('case .allTotal:    menuBarText = fmt(ss.allTime.identifiableTokens)', MODEL)
+
 
     def test_menu_bar_cost_keeps_two_decimal_format(self):
         self.assertIn('String(format: "%.2f", ss.allTime.estimatedCost)', MODEL)

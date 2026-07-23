@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 
 SCHEMA_VERSION = 1
-CLI_VERSION = "1.1.7"
+CLI_VERSION = "1.1.8"
 APP_PATH = Path("/Applications/QuotaView.app")
 BUNDLE_BACKEND = APP_PATH / "Contents/Resources/monitor_backend.py"
 BUNDLE_CLI = APP_PATH / "Contents/Resources/quotaview_cli.py"
@@ -272,6 +272,10 @@ def build_parser():
     p = subs.add_parser("prices", help="读取运行时模型价格"); p.add_argument("source", nargs="?", choices=["all", "antigravity", "codex"], default="all"); p.add_argument("--source", dest="source_option", choices=["all", "antigravity", "codex"]); p.add_argument("--include-legacy", action="store_true"); p.add_argument("--resolved", action="store_true"); p.add_argument("--json", action="store_true")
     p = subs.add_parser("refresh", help="调用 App Bundle 后端刷新数据"); p.add_argument("--wait", action="store_true"); p.add_argument("--timeout", type=float, default=90); p.add_argument("--json", action="store_true")
     p = subs.add_parser("doctor", help="检查本地安装与运行时数据"); p.add_argument("--json", action="store_true")
+    p = subs.add_parser("deepseek", help="DeepSeek API 余额与用量查询/导入")
+    p.add_argument("action", choices=["status", "import"], nargs="?", default="status")
+    p.add_argument("zip_path", nargs="?", help="ZIP 文件路径（仅 import 使用）")
+    p.add_argument("--json", action="store_true")
     subs.add_parser("version", help="显示 CLI 版本")
     return parser
 
@@ -323,6 +327,28 @@ def main(argv=None):
             result = envelope("doctor", doctor_data())
             if args.json: print_json(result)
             else: print(json.dumps(result, ensure_ascii=False, indent=2))
+        elif args.command == "deepseek":
+            import deepseek_backend
+            if args.action == "import":
+                if not args.zip_path:
+                    raise CLIError("missing_argument", "导入命令需提供 ZIP 文件路径，例如: quotaview deepseek import usage.zip")
+                res = deepseek_backend.import_deepseek_usage_zip(args.zip_path, str(RUNTIME_DIR))
+                result = envelope("deepseek_import", res)
+                if args.json: print_json(result)
+                else: print(f"DeepSeek 导入成功 · 包含日期: {res['date_range']} · 新增: {res['new_records']} 条 · 跳过重复: {res['skipped_records']} 条 · 实际金额: {res['actual_amount']} {res['currency']}")
+            else:
+                snapshot = deepseek_backend.get_deepseek_dashboard_snapshot(str(RUNTIME_DIR))
+                result = envelope("deepseek_status", snapshot)
+                if args.json: print_json(result)
+                else:
+                    bal = snapshot["balance"]
+                    usg = snapshot["usage"]
+                    cfg_str = "已配置 Key" if bal["configured"] else "未配置 Key"
+                    print(f"DeepSeek API [{cfg_str}] · 余额: {bal['total_balance']} {bal['currency']} (充值: {bal['topped_up_balance']}, 赠送: {bal['granted_balance']})")
+                    if usg["has_history"]:
+                        print(f"已导入用量: {usg['total_actual_amount']} {usg['currencies'][0] if usg['currencies'] else 'CNY'} · {usg['total_tokens']:,} Tokens · {usg['total_request_count']:,} 次请求 · 覆盖范围: {usg['coverage_start']} 至 {usg['coverage_end']}")
+                    else:
+                        print("已导入用量: 暂无历史用量数据（可通过 quotaview deepseek import <zip-path> 导入官网用量 ZIP）")
         return 0
     except CLIError as exc:
         error = envelope(getattr(args, "command", "unknown"), {"error": {"code": exc.code, "message": exc.message}}, ok=False)

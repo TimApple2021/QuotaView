@@ -6,7 +6,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MACOS_DIR="$PROJECT_DIR/macos"
 APP_NAME="QuotaView"
 EXECUTABLE_NAME="QuotaView"
-VERSION="1.1.7"
+VERSION="1.1.8"
 APP_BUNDLE="$PROJECT_DIR/$APP_NAME.app"
 BIN_DIR="$APP_BUNDLE/Contents/MacOS"
 RES_DIR="$APP_BUNDLE/Contents/Resources"
@@ -21,6 +21,7 @@ mkdir -p "$RES_DIR"
 
 echo "=== 3. 打包后端资源 ==="
 cp "$PROJECT_DIR/monitor_backend.py" "$RES_DIR/monitor_backend.py"
+cp "$PROJECT_DIR/deepseek_backend.py" "$RES_DIR/deepseek_backend.py"
 cp "$PROJECT_DIR/cli/quotaview_cli.py" "$RES_DIR/quotaview_cli.py"
 chmod 755 "$RES_DIR/quotaview_cli.py"
 
@@ -56,7 +57,7 @@ cat << EOF > "$APP_BUNDLE/Contents/Info.plist"
     <key>CFBundleShortVersionString</key>
     <string>$VERSION</string>
     <key>CFBundleVersion</key>
-    <string>117</string>
+    <string>118</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>LSUIElement</key>

@@ -2839,6 +2839,17 @@ def _get_aggregated_stats_unlocked():
             "cost":                       data.get("cost", 0.0),
         })
 
+    # 包含 DeepSeek API 状态与用量快照（独立模块，不混淆 Token/Cost 统计）
+    try:
+        import deepseek_backend
+        result["deepseek"] = deepseek_backend.get_deepseek_dashboard_snapshot(DATA_DIR)
+    except Exception as e:
+        print(f"警告: 读取 DeepSeek 快照失败: {e}", file=sys.stderr)
+        result["deepseek"] = {
+            "balance": {"configured": False, "is_available": False, "currency": "CNY", "total_balance": "0.00", "granted_balance": "0.00", "topped_up_balance": "0.00", "fetched_at": "", "error_code": None, "error_message": None},
+            "usage": {"has_history": False, "coverage_start": "", "coverage_end": "", "last_import_at": "", "currencies": ["CNY"], "total_request_count": 0, "total_input_tokens": 0, "total_output_tokens": 0, "total_tokens": 0, "total_actual_amount": "0.00", "models": [], "keys": [], "daily_series": []}
+        }
+
     # 保存结果至项目本地的 dashboard.json（原子写入）
     dashboard_path = os.path.join(DATA_DIR, "dashboard.json")
     _atomic_write_json(dashboard_path, result)

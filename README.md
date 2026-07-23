@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-QuotaView is a native macOS menu bar app for local, read-only monitoring of Antigravity and Codex. The latest release is **v1.1.7**.
+QuotaView is a native macOS menu bar app for local, read-only monitoring of Antigravity, Codex, and DeepSeek. The latest release is **v1.1.8**.
 
 ## Features
 
@@ -16,16 +16,21 @@ QuotaView is a native macOS menu bar app for local, read-only monitoring of Anti
 - light, dark, and system appearance modes;
 - the read-only `quotaview` CLI;
 - configurable display of both sources, Antigravity only, or Codex only.
+- DeepSeek official balance refresh and manual import of usage ZIP exports from the DeepSeek website;
+- UTC monthly filtering, model breakdowns, and historical API-key usage for imported DeepSeek data;
+- DeepSeek configuration kept separate from the read-only dashboard.
 
 QuotaView stores its own history and settings locally and does not send telemetry or account data to a developer-operated server. Official clients may communicate with their own services normally. QuotaView does not write to official client endpoints, or reset, redeem, consume, or modify quota entitlements.
 
 Installed builds store runtime data in `~/Library/Application Support/Antigravity Token Monitor/`; the project checkout is not required after installation.
 
+DeepSeek history comes from ZIP files manually exported by the user from the DeepSeek website. DeepSeek balance data and Antigravity/Codex API-equivalent costs are separate and are not combined.
+
 Codex plan names are read from the installed official client's local `account/rateLimits/read` response, specifically `rateLimitsByLimitId.codex.planType`. QuotaView does not infer a plan from percentages or usage. If the official response has no plan type, a locally observed token event may be shown with a lower-confidence label; otherwise the plan remains unknown.
 
 ## Install
 
-Download the macOS DMG or ZIP from [Releases](../../releases), move `QuotaView.app` to `/Applications`, and launch it. The current release is arm64 and requires macOS 13 or newer.
+Download the macOS DMG or ZIP from [Releases](../../releases), move `QuotaView.app` to `/Applications`, and launch it. The current release is **v1.1.8**, arm64, and requires macOS 13 or newer.
 
 This release is ad-hoc/linker-signed and not notarized. macOS may require right-clicking the app and choosing **Open**, or allowing it under **Privacy & Security**.
 

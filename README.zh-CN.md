@@ -2,7 +2,7 @@
 
 [English](README.md) | **简体中文**
 
-QuotaView 是一款原生 macOS 菜单栏应用，用于本地、只读监控 Antigravity 和 Codex。当前最新版本为 **v1.1.7**。
+QuotaView 是一款原生 macOS 菜单栏应用，用于本地、只读监控 Antigravity、Codex 和 DeepSeek。当前最新版本为 **v1.1.8**。
 
 ## 功能
 
@@ -16,16 +16,21 @@ QuotaView 是一款原生 macOS 菜单栏应用，用于本地、只读监控 An
 - 浅色、深色和跟随系统主题；
 - 只读 CLI：`quotaview`；
 - 可选择同时显示两个来源，或仅显示 Antigravity / Codex。
+- DeepSeek 官方余额刷新，以及手动导入 DeepSeek 官网导出的用量 ZIP；
+- DeepSeek 导入数据的 UTC 月份筛选、按模型统计和历史 API Key 统计；
+- DeepSeek 配置与只读主页面分离。
 
 QuotaView 将自身历史和设置保存在本机，不向开发者运营的服务器发送遥测或账户数据。官方客户端仍可能正常连接其自身服务。QuotaView 不写回官方客户端接口，也不执行额度 reset、redeem、consume 或修改操作。
 
 安装版将运行数据保存在 `~/Library/Application Support/Antigravity Token Monitor/`；安装后不依赖项目源码目录。
 
+DeepSeek 历史数据来自用户手动从 DeepSeek 官网导出的 ZIP 文件。DeepSeek 余额与 Antigravity/Codex API 等价成本分开计算，不会混合统计。
+
 Codex 套餐名称来自已安装官方客户端本地 `account/rateLimits/read` 响应中的 `rateLimitsByLimitId.codex.planType`。QuotaView 不根据额度百分比或用量猜测套餐。若官方响应缺少套餐字段，可显示带有较低置信度的本地 token 事件观察值；两者都没有时保持未知。
 
 ## 安装
 
-从 [Releases](../../releases) 下载 DMG 或 ZIP，将 `QuotaView.app` 拖入“应用程序”后启动。当前版本支持 Apple Silicon（arm64），最低 macOS 13。
+从 [Releases](../../releases) 下载 DMG 或 ZIP，将 `QuotaView.app` 拖入“应用程序”后启动。当前版本为 **v1.1.8**，支持 Apple Silicon（arm64），最低 macOS 13。
 
 当前版本为 ad-hoc/linker 签名，未经过 Apple 公证。首次打开时，macOS 可能需要右键点击应用并选择“打开”，或在“系统设置 → 隐私与安全性”中允许。
 

@@ -1,5 +1,35 @@
 # Changelog
 
+## v1.1.8
+
+### Added
+
+- DeepSeek as a third independent data source.
+- Official DeepSeek balance refresh.
+- Direct import of DeepSeek usage ZIP exports.
+- UTC monthly filtering and monthly summaries.
+- Model and historical API-key usage breakdowns.
+- DeepSeek CLI `status` and `import` support.
+- A separate DeepSeek settings page.
+
+### Improved
+
+- Stable identity merging when the same API key is renamed.
+- Idempotent duplicate and overlapping ZIP imports.
+- Independent Antigravity, Codex, and DeepSeek menu-bar totals.
+- A unified Dashboard shell for the DeepSeek page.
+- English localization and pricing layout.
+- Historical model ID parsing off the SwiftUI main thread.
+- Atomic Codex scan-cache writes and backup recovery.
+- Stable settings menus and complete source labels.
+
+### Security / Privacy
+
+- DeepSeek API keys remain in a local private credential file.
+- Application Support data uses a private directory and credential files use restrictive permissions.
+- Credentials, billing data, ZIP exports, and runtime data are excluded from Git, App Resources, and release packages.
+- Builds do not read or modify Application Support runtime data.
+
 ## [1.1.7] - 2026-07-22
 
 - Moved historical model ID parsing off the Swift main thread using a background utility queue; a generation counter prevents stale results from overwriting a newer refresh.

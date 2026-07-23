@@ -24,7 +24,10 @@ struct VisualEffectView: NSViewRepresentable {
 
 // MARK: - Page enum
 
-enum PopoverPage { case dashboard, settings }
+enum PopoverPage { case dashboard, settings, deepseekSettings }
+
+
+
 
 // MARK: - QuotaView palette
 
@@ -169,9 +172,10 @@ struct MenuBarView: View {
 
     private var sourceBadgeLabel: String? {
         switch dataModel.displayedSources {
-        case .both: return nil
+        case .all: return nil
         case .antigravityOnly: return "Antigravity"
         case .codexOnly: return "Codex"
+        case .deepseekOnly: return "DeepSeek"
         }
     }
 
@@ -180,15 +184,21 @@ struct MenuBarView: View {
             palette.windowBackground
                 .ignoresSafeArea()
             
-            Group {
-                if page == .dashboard { dashboardPage }
-                else                  { settingsPage  }
+            switch page {
+            case .dashboard:
+                dashboardPage
+            case .settings:
+                settingsPage
+            case .deepseekSettings:
+                deepseekSettingsPage
             }
+
         }
         .frame(width: 360, height: 520)
         .preferredColorScheme(dataModel.theme.colorScheme)
         .id(dataModel.theme.rawValue)
     }
+
 
     private func formatExpirationTime(_ isoString: String?, expiresOn: String?) -> String {
         if let on = expiresOn {
@@ -318,52 +328,27 @@ struct MenuBarView: View {
                     // AI Tool selector
                     if dataModel.shouldShowSourceSegment {
                         VStack(spacing: 6) {
-                            sourceSegmentedControl
+                            topSegmentedControl
                         }
                         .padding(.horizontal, 14)
                         .padding(.top, 10)
                         .padding(.bottom, 6)
                     }
 
-                    // Stat cards
-                    let s = dataModel.filteredStats
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
-                        statCard(dataModel.tr("模型输入", "Input Tokens"), value: dataModel.fmt(s.userInputTokens))
-                        statCard(dataModel.tr("模型输出", "Output Tokens"), value: dataModel.fmt(s.outputTokens))
-                        statCard(dataModel.tr("可识别总量", "Identifiable"), value: dataModel.fmt(s.identifiableTokens))
+
+                    switch dataModel.selectedSource {
+                    case .antigravity, .codex:
+                        standardDashboardContent
+                    case .deepseek:
+                        deepseekDashboardContent
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.top, 8)
-
-                    // Secondary API equivalent cost
-                    HStack {
-                        Text(dataModel.tr("标准 API 等价成本", "Standard API Equivalent Cost"))
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(palette.secondaryText)
-                        Spacer()
-                        Text(String(format: "$%.2f", s.estimatedCost))
-                            .font(.system(size: 12, weight: .bold).monospacedDigit())
-                            .foregroundColor(palette.primaryText)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.top, 8)
-
-                    Text(dataModel.timeRangeLabel(dataModel.selectedRange))
-                        .font(.system(size: 9))
-                        .foregroundColor(palette.secondaryText)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 14)
-                        .padding(.top, 3)
-
-                    // Quota monitoring section
-                    quotaSection
                 }
             }
 
             // Footer
             Divider().background(palette.divider).padding(.top, 8)
             HStack {
-                Button { dataModel.triggerScan() } label: {
+                Button { dataModel.refreshCurrentSource() } label: {
                     RefreshButtonIcon(isScanning: dataModel.isScanning, palette: palette)
                         .frame(width: 32, height: 32, alignment: .center)
                 }
@@ -389,6 +374,45 @@ struct MenuBarView: View {
             .padding(.horizontal, 14).padding(.vertical, 8)
         }
     }
+
+    @ViewBuilder
+    private var standardDashboardContent: some View {
+        VStack(spacing: 0) {
+            // Stat cards
+            let s = dataModel.filteredStats
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
+                statCard(dataModel.tr("模型输入", "Input Tokens"), value: dataModel.fmt(s.userInputTokens))
+                statCard(dataModel.tr("模型输出", "Output Tokens"), value: dataModel.fmt(s.outputTokens))
+                statCard(dataModel.tr("可识别总量", "Identifiable"), value: dataModel.fmt(s.identifiableTokens))
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 8)
+
+            // Secondary API equivalent cost
+            HStack {
+                Text(dataModel.tr("标准 API 等价成本", "Standard API Equivalent Cost"))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(palette.secondaryText)
+                Spacer()
+                Text(String(format: "$%.2f", s.estimatedCost))
+                    .font(.system(size: 12, weight: .bold).monospacedDigit())
+                    .foregroundColor(palette.primaryText)
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 8)
+
+            Text(dataModel.timeRangeLabel(dataModel.selectedRange))
+                .font(.system(size: 9))
+                .foregroundColor(palette.secondaryText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.top, 3)
+
+            // Quota monitoring section
+            quotaSection
+        }
+    }
+
 
     private func quotaProgressColor(for usedPercent: Double) -> Color {
         let clamped = max(0.0, min(100.0, usedPercent))
@@ -569,10 +593,26 @@ struct MenuBarView: View {
     }
 
     private var sourceSegmentedControl: some View {
+        topSegmentedControl
+    }
+
+    @ViewBuilder
+    private func sourceSegment(label: String, source: AISource) -> some View {
+        topTabSegment(label: label, isSelected: page == .dashboard && dataModel.selectedSource == source) {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                dataModel.selectedSource = source
+                page = .dashboard
+            }
+        }
+    }
+
+    private var topSegmentedControl: some View {
         HStack(spacing: 0) {
             sourceSegment(label: "Antigravity", source: .antigravity)
             sourceSegment(label: "Codex", source: .codex)
+            sourceSegment(label: "DeepSeek", source: .deepseek)
         }
+
         .padding(3)
         .background(
             RoundedRectangle(cornerRadius: 8)
@@ -589,11 +629,8 @@ struct MenuBarView: View {
     }
 
     @ViewBuilder
-    private func sourceSegment(label: String, source: AISource) -> some View {
-        let isSelected = dataModel.selectedSource == source
-        Button {
-            dataModel.selectedSource = source
-        } label: {
+    private func topTabSegment(label: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             Text(label)
                 .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
                 .foregroundColor(isSelected ? palette.selectedSegmentText : palette.inactiveSegmentText)
@@ -616,6 +653,7 @@ struct MenuBarView: View {
         }
         .buttonStyle(.plain)
     }
+
 
     // MARK: - Stat card
 
@@ -901,7 +939,34 @@ struct MenuBarView: View {
                         }
                     }
 
+                    // DeepSeek Settings Entrance
+                    settingsGroup {
+                        settingRow(dataModel.tr("DeepSeek 配置", "DeepSeek Settings")) {
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.18)) {
+                                    page = .deepseekSettings
+                                }
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Text(
+                                        dataModel.isDeepSeekConfigured
+                                        ? dataModel.tr("已配置", "Configured")
+                                        : dataModel.tr("未配置", "Not Configured")
+                                    )
+                                    .font(.system(size: 11))
+                                    .foregroundColor(palette.secondaryText)
+
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundColor(palette.secondaryText)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
                     // collapsible "价格配置" section
+
                     settingsGroup {
                         Button {
                             withAnimation { isModelPricingExpanded.toggle() }
@@ -997,6 +1062,444 @@ struct MenuBarView: View {
         }
     }
 
+    // MARK: - DeepSeek Dashboard Content (Pure Data Presentation)
+
+    private var deepseekDashboardContent: some View {
+        let bal = dataModel.deepseekData?.balance
+        let usg = dataModel.deepSeekUsageViewData()
+
+        return VStack(alignment: .leading, spacing: 14) {
+            // 1. Official Live Balance Card Group
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(dataModel.tr("官方当前余额", "Official Live Balance"))
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(palette.primaryText)
+                    Spacer()
+                    if let fetchedAt = bal?.fetchedAt, !fetchedAt.isEmpty {
+                        Text(dataModel.tr("刷新时间: \(formatIsoTime(fetchedAt))", "Updated: \(formatIsoTime(fetchedAt))"))
+                            .font(.system(size: 9))
+                            .foregroundColor(palette.secondaryText)
+                    }
+                }
+
+                if dataModel.isDeepSeekConfigured {
+                    if let err = dataModel.deepseekBalanceError ?? bal?.errorMessage, !err.isEmpty {
+                        Text(err)
+                            .font(.system(size: 9))
+                            .foregroundColor(palette.red)
+                    }
+
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
+                        statCard(dataModel.tr("总余额", "Total Balance"), value: formatBalanceCardValue(raw: bal?.totalBalance, currency: bal?.currency))
+                        statCard(dataModel.tr("充值余额", "Topped Up"), value: formatBalanceCardValue(raw: bal?.toppedUpBalance, currency: bal?.currency))
+                        statCard(dataModel.tr("赠送余额", "Granted"), value: formatBalanceCardValue(raw: bal?.grantedBalance, currency: bal?.currency))
+                    }
+                } else {
+                    HStack {
+                        Text(dataModel.tr("余额尚未连接，请前往设置 > DeepSeek 配置。", "Balance not connected. Please go to Settings > DeepSeek Settings."))
+                            .font(.system(size: 9))
+                            .foregroundColor(palette.secondaryText)
+                        Spacer()
+                    }
+                    .padding(8)
+                    .background(palette.inputBackground)
+                    .cornerRadius(6)
+                }
+            }
+
+            // 2. Exported Usage History Card Group (from ZIP)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(dataModel.tr("官网用量历史", "Exported Usage History"))
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(palette.primaryText)
+                        if let covStart = usg?.coverageStart, !covStart.isEmpty, let covEnd = usg?.coverageEnd, !covEnd.isEmpty {
+                            Text(dataModel.tr("覆盖范围: \(covStart) 至 \(covEnd)", "Coverage: \(covStart) to \(covEnd)"))
+                                .font(.system(size: 9))
+                                .foregroundColor(palette.secondaryText)
+                        }
+                    }
+                    Spacer()
+                    if let months = dataModel.deepseekData?.usage.availableMonths, !months.isEmpty {
+                        Menu {
+                            Button {
+                                dataModel.deepseekSelectedMonth = "all"
+                            } label: {
+                                HStack {
+                                    Text(dataModel.tr("累计", "All Time"))
+                                    if dataModel.deepseekSelectedMonth == "all" { Image(systemName: "checkmark") }
+                                }
+                            }
+                            ForEach(months, id: \.self) { month in
+                                Button {
+                                    dataModel.deepseekSelectedMonth = month
+                                } label: {
+                                    HStack {
+                                        Text(dataModel.deepSeekMonthLabel(month))
+                                        if dataModel.deepseekSelectedMonth == month { Image(systemName: "checkmark") }
+                                    }
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(dataModel.deepSeekMonthLabel(dataModel.deepseekSelectedMonth))
+                            }
+                            .foregroundColor(palette.secondaryText)
+                        }
+                        .menuStyle(.borderlessButton)
+                        .font(.system(size: 9))
+                    }
+                }
+
+                if usg?.hasHistory == true {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
+                        statCard(dataModel.tr("已导入累计消费", "Imported Spend"), value: "\(usg?.totalActualAmount ?? "0.00") \(usg?.currencies.first ?? "CNY")")
+                        statCard(dataModel.tr("API 请求次数", "API Requests"), value: dataModel.language == .chinese ? "\(dataModel.fmt(usg?.totalRequestCount ?? 0)) 次" : dataModel.fmt(usg?.totalRequestCount ?? 0))
+                        statCard(dataModel.tr("总 Token", "Total Tokens"), value: dataModel.fmt(usg?.totalTokens ?? 0))
+                    }
+
+                    // 3. Model Breakdown Card Group
+                    if let models = usg?.models, !models.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(dataModel.tr("按模型统计", "By Model"))
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(palette.secondaryText)
+
+                            ForEach(models) { m in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Text(m.modelId)
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundColor(palette.primaryText)
+                                        .lineLimit(2)
+                                        .fixedSize(horizontal: false, vertical: true)
+
+                                    Spacer()
+
+                                    VStack(alignment: .trailing, spacing: 2) {
+                                        Text("\(m.actualAmount) \(m.currency)")
+                                            .font(.system(size: 10, weight: .bold).monospacedDigit())
+                                            .foregroundColor(palette.primaryText)
+                                        HStack(spacing: 4) {
+                                            Text(dataModel.fmt(m.totalTokens) + " Tokens")
+                                            Text("·")
+                                            Text(dataModel.language == .chinese ? "\(m.requestCount) 次" : "\(m.requestCount) requests")
+                                        }
+                                        .font(.system(size: 9))
+                                        .foregroundColor(palette.secondaryText)
+                                    }
+                                }
+                                .padding(8)
+                                .background(palette.cardBackground)
+                                .cornerRadius(6)
+                                .overlay(RoundedRectangle(cornerRadius: 6).stroke(palette.border, lineWidth: 1))
+                            }
+                        }
+                    }
+
+                    // 4. API Key Breakdown Card Group
+                    if let keys = usg?.keys, !keys.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(dataModel.tr("按历史 API Key 统计", "Historical API Key Usage"))
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(palette.secondaryText)
+
+                            ForEach(keys) { k in
+                                HStack(alignment: .center, spacing: 8) {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(k.apiKeyName)
+                                            .font(.system(size: 10, weight: .medium))
+                                            .foregroundColor(palette.primaryText)
+                                            .lineLimit(1)
+                                        Text(k.apiKeyMasked)
+                                            .font(.system(size: 9).monospacedDigit())
+                                            .foregroundColor(palette.secondaryText)
+                                    }
+
+                                    Spacer()
+
+                                    VStack(alignment: .trailing, spacing: 2) {
+                                        Text("\(k.actualAmount) \(k.currency)")
+                                            .font(.system(size: 10, weight: .bold).monospacedDigit())
+                                            .foregroundColor(palette.primaryText)
+                                        Text(dataModel.fmt(k.totalTokens) + " Tokens")
+                                            .font(.system(size: 9))
+                                            .foregroundColor(palette.secondaryText)
+                                    }
+                                }
+                                .padding(8)
+                                .background(palette.cardBackground)
+                                .cornerRadius(6)
+                                .overlay(RoundedRectangle(cornerRadius: 6).stroke(palette.border, lineWidth: 1))
+                            }
+                        }
+                    }
+                } else {
+                    VStack(spacing: 6) {
+                        Image(systemName: "doc.badge.plus")
+                            .font(.system(size: 24))
+                            .foregroundColor(palette.secondaryText)
+                        Text(dataModel.tr("暂无 DeepSeek 历史用量数据", "No DeepSeek usage history yet"))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(palette.primaryText)
+                        Text(dataModel.tr("请前往 '设置 > DeepSeek 配置' 导入官网导出的 usage_data_*.zip 文件", "Please go to 'Settings > DeepSeek Settings' to import usage_data_*.zip exported from DeepSeek website"))
+                            .font(.system(size: 9))
+                            .foregroundColor(palette.secondaryText)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
+                    .background(palette.cardBackground)
+                    .cornerRadius(8)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(palette.border, lineWidth: 1))
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 10)
+    }
+
+    // MARK: - DeepSeek Settings Page (Key & ZIP Management)
+
+    private var deepseekSettingsPage: some View {
+        let bal = dataModel.deepseekData?.balance
+        let usg = dataModel.deepseekData?.usage
+
+        return VStack(spacing: 0) {
+            // Header Row with Back button
+            HStack(spacing: 8) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) { page = .settings }
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 10, weight: .bold))
+                        Text(dataModel.tr("设置", "Settings"))
+                            .font(.system(size: 11))
+                    }
+                    .foregroundColor(.accentColor)
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Text(dataModel.tr("DeepSeek 配置", "DeepSeek Settings"))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(palette.primaryText)
+
+                Spacer()
+                Spacer().frame(width: 45)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 10)
+
+            Divider().background(palette.divider)
+
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 14) {
+
+                    // 1. API Key Card Group
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text(dataModel.tr("API Key", "API Key"))
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(palette.primaryText)
+                            Spacer()
+
+                            if dataModel.isDeepSeekConfigured {
+                                Text(dataModel.tr("已配置", "Set"))
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundColor(palette.successText)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(palette.successBackground))
+                            } else {
+                                Text(dataModel.tr("未配置", "Not Set"))
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundColor(palette.secondaryText)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(palette.cardBackground))
+                            }
+                        }
+
+                        HStack(spacing: 8) {
+                            SecureField(dataModel.tr("输入 sk-...", "Enter sk-..."), text: $dataModel.deepseekApiKeyInput)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.system(size: 11))
+
+                            Button(dataModel.tr("保存", "Save")) {
+                                dataModel.saveDeepSeekApiKey(dataModel.deepseekApiKeyInput)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .font(.system(size: 11))
+                            .disabled(dataModel.deepseekApiKeyInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                            if dataModel.isDeepSeekConfigured {
+                                Button(dataModel.tr("删除 Key", "Delete Key")) {
+                                    dataModel.deleteDeepSeekApiKey()
+                                }
+                                .buttonStyle(.bordered)
+                                .foregroundColor(palette.red)
+                                .font(.system(size: 11))
+                            }
+                        }
+
+                        HStack {
+                            Button {
+                                dataModel.refreshDeepSeekBalance(forcedKey: nil)
+                            } label: {
+                                HStack(spacing: 4) {
+                                    if dataModel.isDeepSeekBalanceLoading {
+                                        ProgressView()
+                                            .controlSize(.small)
+                                            .scaleEffect(0.7)
+                                    } else {
+                                        Image(systemName: "arrow.clockwise")
+                                            .font(.system(size: 10, weight: .medium))
+                                    }
+                                        Text(dataModel.tr("测试连接并刷新余额", "Test & Refresh"))
+                                        .font(.system(size: 10, weight: .medium))
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(dataModel.isDeepSeekBalanceLoading)
+
+                            Spacer()
+
+                            if let fetchedAt = bal?.fetchedAt, !fetchedAt.isEmpty {
+                                Text(dataModel.tr("成功刷新: \(formatIsoTime(fetchedAt))", "Refreshed: \(formatIsoTime(fetchedAt))"))
+                                    .font(.system(size: 9))
+                                    .foregroundColor(palette.secondaryText)
+                            }
+                        }
+
+                        Text(dataModel.tr("API Key 仅保存在本机 Application Support 私有文件中 (0600)。", "API Key is stored in local Application Support private file (0600) only."))
+                            .font(.system(size: 9))
+                            .foregroundColor(palette.secondaryText)
+
+                        if let err = dataModel.deepseekBalanceError ?? bal?.errorMessage, !err.isEmpty {
+                            Text(err)
+                                .font(.system(size: 9))
+                                .foregroundColor(palette.red)
+                        }
+                    }
+                    .padding(10)
+                    .background(palette.cardBackground)
+                    .cornerRadius(8)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(palette.border, lineWidth: 1))
+
+                    // 2. Exported Usage ZIP Card Group
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(dataModel.tr("官网用量数据导入 (ZIP)", "Exported Usage Import (ZIP)"))
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(palette.primaryText)
+                                Text(dataModel.tr("支持官网导出的 usage_data_*.zip 文件", "Supports usage_data_*.zip exported from DeepSeek website"))
+                                    .font(.system(size: 9))
+                                    .foregroundColor(palette.secondaryText)
+                            }
+                            Spacer()
+
+                            Button {
+                                selectAndImportDeepSeekZip()
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "square.and.arrow.down")
+                                        .font(.system(size: 11))
+                                    Text(dataModel.tr("导入 ZIP", "Import ZIP"))
+                                        .font(.system(size: 11, weight: .medium))
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(dataModel.isDeepSeekImporting)
+                        }
+
+                        if let statusMsg = dataModel.deepseekStatusMessage {
+                            Text(statusMsg)
+                                .font(.system(size: 9))
+                                .foregroundColor(palette.blue)
+                        }
+
+                        if usg?.hasHistory == true {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text(dataModel.tr("数据覆盖范围:", "Data Coverage:"))
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundColor(palette.secondaryText)
+                                    Text(dataModel.tr("\(usg?.coverageStart ?? "") 至 \(usg?.coverageEnd ?? "")", "\(usg?.coverageStart ?? "") to \(usg?.coverageEnd ?? "")"))
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundColor(palette.primaryText)
+                                }
+                                HStack {
+                                    Text(dataModel.tr("已导入累计消费:", "Imported Spend:"))
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundColor(palette.secondaryText)
+                                    Text("\(usg?.totalActualAmount ?? "0.00") \(usg?.currencies.first ?? "CNY")")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundColor(palette.primaryText)
+                                    Spacer()
+                                    Text(dataModel.tr("格式: 重复导入与重叠日期自动去重", "Auto-deduplicated on re-import"))
+                                        .font(.system(size: 9))
+                                        .foregroundColor(palette.secondaryText)
+                                }
+                            }
+                            .padding(8)
+                            .background(palette.inputBackground)
+                            .cornerRadius(6)
+                        } else {
+                            Text(dataModel.tr("尚未导入 ZIP 历史。导入后将自动在 DeepSeek 主页面展示 Token、消费与模型明细。", "No ZIP imported yet. Imported data will automatically render in the DeepSeek dashboard."))
+                                .font(.system(size: 9))
+                                .foregroundColor(palette.secondaryText)
+                        }
+                    }
+                    .padding(10)
+                    .background(palette.cardBackground)
+                    .cornerRadius(8)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(palette.border, lineWidth: 1))
+
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+            }
+        }
+    }
+
+
+
+    private func formatBalanceCardValue(raw: String?, currency: String?) -> String {
+        if !dataModel.isDeepSeekConfigured {
+            return dataModel.tr("未配置", "Not Set")
+        }
+        if dataModel.isDeepSeekBalanceLoading && (raw == nil || raw == "0.00" || raw == "—") {
+            return dataModel.tr("刷新中...", "Loading...")
+        }
+        if let val = raw, !val.isEmpty, val != "0.00", val != "—" {
+            return "\(val) \(currency ?? "CNY")"
+        }
+        if let val = raw, val == "0.00" && dataModel.deepseekData?.balance.fetchedAt.isEmpty == false {
+            return "0.00 \(currency ?? "CNY")"
+        }
+
+        return "—"
+    }
+
+    private func selectAndImportDeepSeekZip() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.zip]
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = dataModel.tr("选择并导入", "Select & Import")
+        panel.message = dataModel.tr("请选择从 DeepSeek 官网导出的 usage_data_*.zip", "Select usage_data_*.zip exported from DeepSeek website")
+
+        if panel.runModal() == .OK, let url = panel.url {
+            dataModel.importDeepSeekZip(at: url)
+        }
+    }
+
+
     private func modelPriceRow(key: String, detail: ModelPriceDetail, source: AISource) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(detail.displayName)
@@ -1018,87 +1521,110 @@ struct MenuBarView: View {
                 }
             } else if key == "gemini-3.1-pro", let threshold = detail.thresholdTokens {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("普通上下文（≤\(threshold / 1000)K）：输入 $\(detail.standardInputPrice ?? detail.inputPricePerMillion, specifier: "%.2f") · 缓存 $\(detail.standardCachedInputPrice ?? detail.cachedInputPricePerMillion ?? 0, specifier: "%.2f") · 输出 $\(detail.standardOutputPrice ?? detail.outputPricePerMillion, specifier: "%.2f")")
-                    Text("长上下文（>\(threshold / 1000)K）：输入 $\(detail.longContextInputPrice ?? 0, specifier: "%.2f") · 缓存 $\(detail.longContextCachedInputPrice ?? 0, specifier: "%.2f") · 输出 $\(detail.longContextOutputPrice ?? 0, specifier: "%.2f")")
+                    if dataModel.language == .chinese {
+                        Text("普通上下文（≤\(threshold / 1000)K）：输入 $\(detail.standardInputPrice ?? detail.inputPricePerMillion, specifier: "%.2f") · 缓存 $\(detail.standardCachedInputPrice ?? detail.cachedInputPricePerMillion ?? 0, specifier: "%.2f") · 输出 $\(detail.standardOutputPrice ?? detail.outputPricePerMillion, specifier: "%.2f")")
+                        Text("长上下文（>\(threshold / 1000)K）：输入 $\(detail.longContextInputPrice ?? 0, specifier: "%.2f") · 缓存 $\(detail.longContextCachedInputPrice ?? 0, specifier: "%.2f") · 输出 $\(detail.longContextOutputPrice ?? 0, specifier: "%.2f")")
+                    } else {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Standard context (≤\(threshold / 1000)K)")
+                                .font(.system(size: 9, weight: .medium))
+                                .fixedSize(horizontal: false, vertical: true)
+                            HStack(spacing: 5) {
+                                Text("Input").fixedSize(horizontal: true, vertical: false)
+                                Text("$\(detail.standardInputPrice ?? detail.inputPricePerMillion, specifier: "%.2f")").monospacedDigit()
+                                Text("·")
+                                Text("Cached").fixedSize(horizontal: true, vertical: false)
+                                Text("$\(detail.standardCachedInputPrice ?? detail.cachedInputPricePerMillion ?? 0, specifier: "%.2f")").monospacedDigit()
+                                Text("·")
+                                Text("Output").fixedSize(horizontal: true, vertical: false)
+                                Text("$\(detail.standardOutputPrice ?? detail.outputPricePerMillion, specifier: "%.2f")").monospacedDigit()
+                            }
+                            .font(.system(size: 8))
+                            .fixedSize(horizontal: false, vertical: true)
+                        }
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Long context (>\(threshold / 1000)K)")
+                                .font(.system(size: 9, weight: .medium))
+                                .fixedSize(horizontal: false, vertical: true)
+                            HStack(spacing: 5) {
+                                Text("Input").fixedSize(horizontal: true, vertical: false)
+                                Text("$\(detail.longContextInputPrice ?? 0, specifier: "%.2f")").monospacedDigit()
+                                Text("·")
+                                Text("Cached").fixedSize(horizontal: true, vertical: false)
+                                Text("$\(detail.longContextCachedInputPrice ?? 0, specifier: "%.2f")").monospacedDigit()
+                                Text("·")
+                                Text("Output").fixedSize(horizontal: true, vertical: false)
+                                Text("$\(detail.longContextOutputPrice ?? 0, specifier: "%.2f")").monospacedDigit()
+                            }
+                            .font(.system(size: 8))
+                            .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
                 }
-                .font(.system(size: 8, design: .monospaced))
                 .foregroundColor(palette.secondaryText)
             } else {
-            HStack(spacing: 8) {
-                // Input Price
-                Text(dataModel.tr("输入:", "Input:")).font(.system(size: 9)).foregroundColor(palette.secondaryText)
-                TextField("", value: Binding(
-                    get: { detail.inputPricePerMillion },
-                    set: { newVal in
-                        var updated = detail
-                        updated.inputPricePerMillion = newVal
-                        updated.userOverridden = true
-                        updated.pricingSource = "User Override"
-                        dataModel.updateModelPrice(key, detail: updated)
-                    }
-                ), format: .number)
-                .textFieldStyle(.plain)
-                .padding(.horizontal, 6).padding(.vertical, 3)
-                .background(palette.inputBackground)
-                .cornerRadius(4)
-                .overlay(RoundedRectangle(cornerRadius: 4).stroke(palette.border, lineWidth: 1))
-                .font(.system(size: 9, design: .monospaced))
-                .foregroundColor(palette.primaryText)
-                .frame(width: 55)
-                .onSubmit { dataModel.saveSettingsFile() }
-                
-                // Cached Price (only if source is Codex)
-                if source == .codex {
-                    Spacer()
-                    Text(dataModel.tr("缓存:", "Cached:")).font(.system(size: 9)).foregroundColor(palette.secondaryText)
-                    TextField("", value: Binding(
-                        get: { detail.cachedInputPricePerMillion ?? 0.0 },
+                HStack(alignment: .top, spacing: 8) {
+                    priceColumn(label: dataModel.tr("输入", "Input"), value: Binding(
+                        get: { detail.inputPricePerMillion },
                         set: { newVal in
                             var updated = detail
-                            updated.cachedInputPricePerMillion = newVal
+                            updated.inputPricePerMillion = newVal
                             updated.userOverridden = true
                             updated.pricingSource = "User Override"
                             dataModel.updateModelPrice(key, detail: updated)
                         }
-                    ), format: .number)
-                    .textFieldStyle(.plain)
-                    .padding(.horizontal, 6).padding(.vertical, 3)
-                    .background(palette.inputBackground)
-                    .cornerRadius(4)
-                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(palette.border, lineWidth: 1))
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundColor(palette.primaryText)
-                    .frame(width: 55)
-                    .onSubmit { dataModel.saveSettingsFile() }
-                }
-                
-                Spacer()
-                
-                // Output Price
-                Text(dataModel.tr("输出:", "Output:")).font(.system(size: 9)).foregroundColor(palette.secondaryText)
-                TextField("", value: Binding(
-                    get: { detail.outputPricePerMillion },
-                    set: { newVal in
-                        var updated = detail
-                        updated.outputPricePerMillion = newVal
-                        updated.userOverridden = true
-                        updated.pricingSource = "User Override"
-                        dataModel.updateModelPrice(key, detail: updated)
+                    ))
+
+                    if source == .codex {
+                        priceColumn(label: dataModel.tr("缓存", "Cached"), value: Binding(
+                            get: { detail.cachedInputPricePerMillion ?? 0.0 },
+                            set: { newVal in
+                                var updated = detail
+                                updated.cachedInputPricePerMillion = newVal
+                                updated.userOverridden = true
+                                updated.pricingSource = "User Override"
+                                dataModel.updateModelPrice(key, detail: updated)
+                            }
+                        ))
                     }
-                ), format: .number)
+
+                    priceColumn(label: dataModel.tr("输出", "Output"), value: Binding(
+                        get: { detail.outputPricePerMillion },
+                        set: { newVal in
+                            var updated = detail
+                            updated.outputPricePerMillion = newVal
+                            updated.userOverridden = true
+                            updated.pricingSource = "User Override"
+                            dataModel.updateModelPrice(key, detail: updated)
+                        }
+                    ))
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private func priceColumn(label: String, value: Binding<Double>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 9))
+                .foregroundColor(palette.secondaryText)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+            TextField("", value: value, format: .number)
                 .textFieldStyle(.plain)
-                .padding(.horizontal, 6).padding(.vertical, 3)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
                 .background(palette.inputBackground)
                 .cornerRadius(4)
                 .overlay(RoundedRectangle(cornerRadius: 4).stroke(palette.border, lineWidth: 1))
                 .font(.system(size: 9, design: .monospaced))
                 .foregroundColor(palette.primaryText)
-                .frame(width: 55)
+                .frame(maxWidth: .infinity)
                 .onSubmit { dataModel.saveSettingsFile() }
-            }
-            }
         }
-        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Settings helpers
@@ -1132,8 +1658,9 @@ struct MenuBarView: View {
 
     private func resetDefaults() {
         dataModel.menuBarDisplay  = .days7Total
-        dataModel.displayedSources = .both
+        dataModel.displayedSources = .all
         dataModel.selectedRange   = .days7
+
         dataModel.refreshInterval = .min5
         dataModel.theme           = .system
         dataModel.scanOnStartup   = false

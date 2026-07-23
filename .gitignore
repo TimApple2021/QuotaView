@@ -5,6 +5,9 @@ data/*.json.bak
 data/*.lock
 data/.usage_cache.json
 .usage_cache.json
+/data/**/*.json
+/data/**/*.json.bak
+/data/**/*.lock
 logs/
 runtime/
 Application Support/
@@ -32,6 +35,37 @@ dist/
 *.dmg
 *.zip
 SHA256SUMS.txt
+
+# DeepSeek private runtime files
+deepseek_credentials.json
+deepseek_usage_history.json
+deepseek_balance_cache.json
+dashboard.json
+daily_history.json
+codex_scan_cache.json
+conversation_history.json
+settings.json
+
+# Imported private usage files
+usage_data_*.zip
+usage_data_*.csv
+/deepseek_imports/
+/imports/
+/exports/
+
+# Private local artifacts
+/screenshots/
+/private/
+/artifacts/
+/tmp/
+Screen Shot *.png
+Screenshot *.png
+截屏*.png
+截图*.png
+
+# Local backups
+/backup/
+/backups/
 
 # Private audit and scratch material
 scratch/

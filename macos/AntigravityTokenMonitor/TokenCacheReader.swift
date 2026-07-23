@@ -416,6 +416,7 @@ struct LightDashboard: Codable {
     let allSeries:      [DailySeriesEntry]
     let codexAuthInfo:  CodexAuthInfo?
     let quotaStatus:    [String: QuotaStatus]?
+    let deepseek:       DeepSeekDashboardData?
 
     enum CodingKeys: String, CodingKey {
         case lastScanTime   = "last_scan_time"
@@ -427,12 +428,14 @@ struct LightDashboard: Codable {
         case allSeries      = "all_series"
         case codexAuthInfo  = "codex_auth_info"
         case quotaStatus    = "quota_status"
+        case deepseek
     }
 
     init(lastScanTime: String, scanDurationMs: Int, todayHasHourly: Bool,
          sources: [String: SourceStats], last7Series: [DailySeriesEntry],
          last30Series: [DailySeriesEntry], allSeries: [DailySeriesEntry],
-         codexAuthInfo: CodexAuthInfo?, quotaStatus: [String: QuotaStatus]?) {
+         codexAuthInfo: CodexAuthInfo?, quotaStatus: [String: QuotaStatus]?,
+         deepseek: DeepSeekDashboardData? = nil) {
         self.lastScanTime = lastScanTime
         self.scanDurationMs = scanDurationMs
         self.todayHasHourly = todayHasHourly
@@ -442,6 +445,7 @@ struct LightDashboard: Codable {
         self.allSeries = allSeries
         self.codexAuthInfo = codexAuthInfo
         self.quotaStatus = quotaStatus
+        self.deepseek = deepseek
     }
 
     init(from decoder: Decoder) throws {
@@ -455,14 +459,378 @@ struct LightDashboard: Codable {
         allSeries = try c.decodeIfPresent([DailySeriesEntry].self, forKey: .allSeries) ?? []
         codexAuthInfo = try c.decodeIfPresent(CodexAuthInfo.self, forKey: .codexAuthInfo)
         quotaStatus = (try? c.decode(LossyQuotaStatusMap.self, forKey: .quotaStatus))?.values
+        deepseek = try? c.decodeIfPresent(DeepSeekDashboardData.self, forKey: .deepseek)
     }
 
     static let empty = LightDashboard(
         lastScanTime: "—", scanDurationMs: 0, todayHasHourly: false,
         sources: [:], last7Series: [], last30Series: [], allSeries: [],
-        codexAuthInfo: nil, quotaStatus: nil
+        codexAuthInfo: nil, quotaStatus: nil, deepseek: nil
     )
 }
+
+// MARK: - DeepSeek Data Structures
+
+struct DeepSeekBalanceInfoItemModel: Codable, Hashable, Identifiable {
+    let currency: String
+    let totalBalance: String
+    let grantedBalance: String
+    let toppedUpBalance: String
+
+    var id: String { currency }
+
+    enum CodingKeys: String, CodingKey {
+        case currency
+        case totalBalance = "total_balance"
+        case grantedBalance = "granted_balance"
+        case toppedUpBalance = "topped_up_balance"
+    }
+
+    init(currency: String, totalBalance: String, grantedBalance: String, toppedUpBalance: String) {
+        self.currency = currency
+        self.totalBalance = totalBalance
+        self.grantedBalance = grantedBalance
+        self.toppedUpBalance = toppedUpBalance
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        currency = (try? c.decode(String.self, forKey: .currency)) ?? "CNY"
+        totalBalance = (try? c.decode(String.self, forKey: .totalBalance)) ?? "0.00"
+        grantedBalance = (try? c.decode(String.self, forKey: .grantedBalance)) ?? "0.00"
+        toppedUpBalance = (try? c.decode(String.self, forKey: .toppedUpBalance)) ?? "0.00"
+    }
+}
+
+struct DeepSeekBalanceInfo: Codable, Hashable {
+    let configured: Bool
+    let isAvailable: Bool
+    let currency: String
+    let totalBalance: String
+    let grantedBalance: String
+    let toppedUpBalance: String
+    let balanceInfos: [DeepSeekBalanceInfoItemModel]
+    let fetchedAt: String
+    let errorCode: String?
+    let errorMessage: String?
+
+    enum CodingKeys: String, CodingKey {
+        case configured
+        case isAvailable = "is_available"
+        case currency
+        case totalBalance = "total_balance"
+        case grantedBalance = "granted_balance"
+        case toppedUpBalance = "topped_up_balance"
+        case balanceInfos = "balance_infos"
+        case fetchedAt = "fetched_at"
+        case errorCode = "error_code"
+        case errorMessage = "error_message"
+    }
+
+    init(configured: Bool, isAvailable: Bool, currency: String, totalBalance: String,
+         grantedBalance: String, toppedUpBalance: String,
+         balanceInfos: [DeepSeekBalanceInfoItemModel] = [],
+         fetchedAt: String, errorCode: String? = nil, errorMessage: String? = nil) {
+        self.configured = configured
+        self.isAvailable = isAvailable
+        self.currency = currency
+        self.totalBalance = totalBalance
+        self.grantedBalance = grantedBalance
+        self.toppedUpBalance = toppedUpBalance
+        self.balanceInfos = balanceInfos
+        self.fetchedAt = fetchedAt
+        self.errorCode = errorCode
+        self.errorMessage = errorMessage
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        configured = (try? c.decode(Bool.self, forKey: .configured)) ?? false
+        isAvailable = (try? c.decode(Bool.self, forKey: .isAvailable)) ?? false
+        currency = (try? c.decode(String.self, forKey: .currency)) ?? "CNY"
+        totalBalance = (try? c.decode(String.self, forKey: .totalBalance)) ?? "0.00"
+        grantedBalance = (try? c.decode(String.self, forKey: .grantedBalance)) ?? "0.00"
+        toppedUpBalance = (try? c.decode(String.self, forKey: .toppedUpBalance)) ?? "0.00"
+        balanceInfos = (try? c.decode([DeepSeekBalanceInfoItemModel].self, forKey: .balanceInfos)) ?? []
+        fetchedAt = (try? c.decode(String.self, forKey: .fetchedAt)) ?? ""
+        errorCode = try? c.decode(String.self, forKey: .errorCode)
+        errorMessage = try? c.decode(String.self, forKey: .errorMessage)
+    }
+}
+
+
+struct DeepSeekModelItem: Codable, Hashable, Identifiable {
+    let modelId: String
+    let requestCount: Int
+    let inputTokens: Int
+    let outputTokens: Int
+    let totalTokens: Int
+    let actualAmount: String
+    let currency: String
+
+    var id: String { modelId }
+
+    enum CodingKeys: String, CodingKey {
+        case modelId = "model_id"
+        case requestCount = "request_count"
+        case inputTokens = "input_tokens"
+        case outputTokens = "output_tokens"
+        case totalTokens = "total_tokens"
+        case actualAmount = "actual_amount"
+        case currency
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        modelId = (try? c.decode(String.self, forKey: .modelId)) ?? "unknown"
+        requestCount = (try? c.decode(Int.self, forKey: .requestCount)) ?? 0
+        inputTokens = (try? c.decode(Int.self, forKey: .inputTokens)) ?? 0
+        outputTokens = (try? c.decode(Int.self, forKey: .outputTokens)) ?? 0
+        totalTokens = (try? c.decode(Int.self, forKey: .totalTokens)) ?? (inputTokens + outputTokens)
+        actualAmount = (try? c.decode(String.self, forKey: .actualAmount)) ?? "0.00"
+        currency = (try? c.decode(String.self, forKey: .currency)) ?? "CNY"
+    }
+}
+
+struct DeepSeekKeyItem: Codable, Hashable, Identifiable {
+    let canonicalKeyId: String?
+    let apiKeyName: String
+    let apiKeyMasked: String
+    let requestCount: Int
+    let inputTokens: Int
+    let outputTokens: Int
+    let totalTokens: Int
+    let actualAmount: String
+    let currency: String
+
+    var id: String { canonicalKeyId ?? "\(apiKeyName)_\(apiKeyMasked)" }
+
+    enum CodingKeys: String, CodingKey {
+        case canonicalKeyId = "canonical_key_id"
+        case apiKeyName = "api_key_name"
+        case apiKeyMasked = "api_key_masked"
+        case requestCount = "request_count"
+        case inputTokens = "input_tokens"
+        case outputTokens = "output_tokens"
+        case totalTokens = "total_tokens"
+        case actualAmount = "actual_amount"
+        case currency
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        canonicalKeyId = try? c.decode(String.self, forKey: .canonicalKeyId)
+        apiKeyName = (try? c.decode(String.self, forKey: .apiKeyName)) ?? "默认"
+        apiKeyMasked = (try? c.decode(String.self, forKey: .apiKeyMasked)) ?? "sk-****"
+        requestCount = (try? c.decode(Int.self, forKey: .requestCount)) ?? 0
+        inputTokens = (try? c.decode(Int.self, forKey: .inputTokens)) ?? 0
+        outputTokens = (try? c.decode(Int.self, forKey: .outputTokens)) ?? 0
+        totalTokens = (try? c.decode(Int.self, forKey: .totalTokens)) ?? (inputTokens + outputTokens)
+        actualAmount = (try? c.decode(String.self, forKey: .actualAmount)) ?? "0.00"
+        currency = (try? c.decode(String.self, forKey: .currency)) ?? "CNY"
+    }
+}
+
+struct DeepSeekDailyEntry: Codable, Hashable, Identifiable {
+    let date: String
+    let requestCount: Int
+    let inputTokens: Int
+    let outputTokens: Int
+    let totalTokens: Int
+    let actualAmount: String
+    let currency: String
+
+    var id: String { date }
+
+    enum CodingKeys: String, CodingKey {
+        case date
+        case requestCount = "request_count"
+        case inputTokens = "input_tokens"
+        case outputTokens = "output_tokens"
+        case totalTokens = "total_tokens"
+        case actualAmount = "actual_amount"
+        case currency
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        date = (try? c.decode(String.self, forKey: .date)) ?? ""
+        requestCount = (try? c.decode(Int.self, forKey: .requestCount)) ?? 0
+        inputTokens = (try? c.decode(Int.self, forKey: .inputTokens)) ?? 0
+        outputTokens = (try? c.decode(Int.self, forKey: .outputTokens)) ?? 0
+        totalTokens = (try? c.decode(Int.self, forKey: .totalTokens)) ?? (inputTokens + outputTokens)
+        actualAmount = (try? c.decode(String.self, forKey: .actualAmount)) ?? "0.00"
+        currency = (try? c.decode(String.self, forKey: .currency)) ?? "CNY"
+    }
+}
+
+struct DeepSeekMonthlySummary: Codable, Hashable, Identifiable {
+    let month: String
+    let coverageStart: String
+    let coverageEnd: String
+    let totalActualAmount: String
+    let totalRequestCount: Int
+    let totalInputTokens: Int
+    let totalOutputTokens: Int
+    let totalTokens: Int
+    let models: [DeepSeekModelItem]
+    let keys: [DeepSeekKeyItem]
+
+    var id: String { month }
+
+    enum CodingKeys: String, CodingKey {
+        case month
+        case coverageStart = "coverage_start"
+        case coverageEnd = "coverage_end"
+        case totalActualAmount = "total_actual_amount"
+        case totalRequestCount = "total_request_count"
+        case totalInputTokens = "total_input_tokens"
+        case totalOutputTokens = "total_output_tokens"
+        case totalTokens = "total_tokens"
+        case models, keys
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        month = (try? c.decode(String.self, forKey: .month)) ?? ""
+        coverageStart = (try? c.decode(String.self, forKey: .coverageStart)) ?? ""
+        coverageEnd = (try? c.decode(String.self, forKey: .coverageEnd)) ?? ""
+        totalActualAmount = (try? c.decode(String.self, forKey: .totalActualAmount)) ?? "0.00"
+        totalRequestCount = (try? c.decode(Int.self, forKey: .totalRequestCount)) ?? 0
+        totalInputTokens = (try? c.decode(Int.self, forKey: .totalInputTokens)) ?? 0
+        totalOutputTokens = (try? c.decode(Int.self, forKey: .totalOutputTokens)) ?? 0
+        totalTokens = (try? c.decode(Int.self, forKey: .totalTokens)) ?? (totalInputTokens + totalOutputTokens)
+        models = (try? c.decode([DeepSeekModelItem].self, forKey: .models)) ?? []
+        keys = (try? c.decode([DeepSeekKeyItem].self, forKey: .keys)) ?? []
+    }
+}
+
+struct DeepSeekUsageInfo: Codable, Hashable {
+    let hasHistory: Bool
+    let coverageStart: String
+    let coverageEnd: String
+    let lastImportAt: String
+    let currencies: [String]
+    let totalRequestCount: Int
+    let totalInputTokens: Int
+    let totalOutputTokens: Int
+    let totalTokens: Int
+    let totalActualAmount: String
+    let models: [DeepSeekModelItem]
+    let keys: [DeepSeekKeyItem]
+    let dailySeries: [DeepSeekDailyEntry]
+    let availableMonths: [String]
+    let monthlySummaries: [DeepSeekMonthlySummary]
+
+    enum CodingKeys: String, CodingKey {
+        case hasHistory = "has_history"
+        case coverageStart = "coverage_start"
+        case coverageEnd = "coverage_end"
+        case lastImportAt = "last_import_at"
+        case currencies
+        case totalRequestCount = "total_request_count"
+        case totalInputTokens = "total_input_tokens"
+        case totalOutputTokens = "total_output_tokens"
+        case totalTokens = "total_tokens"
+        case totalActualAmount = "total_actual_amount"
+        case models, keys
+        case dailySeries = "daily_series"
+        case availableMonths = "available_months"
+        case monthlySummaries = "monthly_summaries"
+    }
+
+    init(hasHistory: Bool, coverageStart: String, coverageEnd: String, lastImportAt: String,
+         currencies: [String] = ["CNY"], totalRequestCount: Int = 0, totalInputTokens: Int = 0,
+         totalOutputTokens: Int = 0, totalTokens: Int = 0, totalActualAmount: String = "0.00",
+         models: [DeepSeekModelItem] = [], keys: [DeepSeekKeyItem] = [], dailySeries: [DeepSeekDailyEntry] = []) {
+        self.hasHistory = hasHistory
+        self.coverageStart = coverageStart
+        self.coverageEnd = coverageEnd
+        self.lastImportAt = lastImportAt
+        self.currencies = currencies
+        self.totalRequestCount = totalRequestCount
+        self.totalInputTokens = totalInputTokens
+        self.totalOutputTokens = totalOutputTokens
+        self.totalTokens = totalTokens
+        self.totalActualAmount = totalActualAmount
+        self.models = models
+        self.keys = keys
+        self.dailySeries = dailySeries
+        self.availableMonths = []
+        self.monthlySummaries = []
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        hasHistory = (try? c.decode(Bool.self, forKey: .hasHistory)) ?? false
+        coverageStart = (try? c.decode(String.self, forKey: .coverageStart)) ?? ""
+        coverageEnd = (try? c.decode(String.self, forKey: .coverageEnd)) ?? ""
+        lastImportAt = (try? c.decode(String.self, forKey: .lastImportAt)) ?? ""
+        currencies = (try? c.decode([String].self, forKey: .currencies)) ?? ["CNY"]
+        totalRequestCount = (try? c.decode(Int.self, forKey: .totalRequestCount)) ?? 0
+        totalInputTokens = (try? c.decode(Int.self, forKey: .totalInputTokens)) ?? 0
+        totalOutputTokens = (try? c.decode(Int.self, forKey: .totalOutputTokens)) ?? 0
+        totalTokens = (try? c.decode(Int.self, forKey: .totalTokens)) ?? (totalInputTokens + totalOutputTokens)
+        totalActualAmount = (try? c.decode(String.self, forKey: .totalActualAmount)) ?? "0.00"
+        models = (try? c.decode([DeepSeekModelItem].self, forKey: .models)) ?? []
+        keys = (try? c.decode([DeepSeekKeyItem].self, forKey: .keys)) ?? []
+        dailySeries = (try? c.decode([DeepSeekDailyEntry].self, forKey: .dailySeries)) ?? []
+        availableMonths = (try? c.decode([String].self, forKey: .availableMonths)) ?? []
+        monthlySummaries = (try? c.decode([DeepSeekMonthlySummary].self, forKey: .monthlySummaries)) ?? []
+    }
+}
+
+struct DeepSeekUsageViewData: Hashable {
+    let coverageStart: String
+    let coverageEnd: String
+    let totalActualAmount: String
+    let totalRequestCount: Int
+    let totalTokens: Int
+    let currencies: [String]
+    let models: [DeepSeekModelItem]
+    let keys: [DeepSeekKeyItem]
+
+    var hasHistory: Bool {
+        totalTokens > 0 || totalRequestCount > 0 || totalActualAmount != "0.00"
+    }
+
+    init(_ usage: DeepSeekUsageInfo) {
+        coverageStart = usage.coverageStart; coverageEnd = usage.coverageEnd
+        totalActualAmount = usage.totalActualAmount; totalRequestCount = usage.totalRequestCount
+        totalTokens = usage.totalTokens; currencies = usage.currencies; models = usage.models; keys = usage.keys
+    }
+
+    init(_ summary: DeepSeekMonthlySummary, currencies: [String]) {
+        coverageStart = summary.coverageStart; coverageEnd = summary.coverageEnd
+        totalActualAmount = summary.totalActualAmount; totalRequestCount = summary.totalRequestCount
+        totalTokens = summary.totalTokens; self.currencies = currencies; models = summary.models; keys = summary.keys
+    }
+}
+
+struct DeepSeekDashboardData: Codable, Hashable {
+    var balance: DeepSeekBalanceInfo
+    let usage: DeepSeekUsageInfo
+
+    init(balance: DeepSeekBalanceInfo, usage: DeepSeekUsageInfo) {
+        self.balance = balance
+        self.usage = usage
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let defaultBal = try? c.decode(DeepSeekBalanceInfo.self, forKey: .balance)
+        let defaultUsg = try? c.decode(DeepSeekUsageInfo.self, forKey: .usage)
+        if let b = defaultBal, let u = defaultUsg {
+            balance = b
+            usage = u
+        } else {
+            balance = DeepSeekBalanceInfo(configured: false, isAvailable: false, currency: "CNY", totalBalance: "0.00", grantedBalance: "0.00", toppedUpBalance: "0.00", fetchedAt: "", errorCode: "unconfigured", errorMessage: nil)
+            usage = DeepSeekUsageInfo(hasHistory: false, coverageStart: "", coverageEnd: "", lastImportAt: "")
+        }
+    }
+}
+
+
 
 // MARK: - TokenCacheReader
 

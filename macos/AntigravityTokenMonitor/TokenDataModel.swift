@@ -8,6 +8,7 @@ import ServiceManagement
 enum AISource: String, CaseIterable, Identifiable {
     case antigravity = "Antigravity"
     case codex       = "Codex"
+    case deepseek    = "DeepSeek"
     
     var id: String { rawValue }
     
@@ -15,9 +16,11 @@ enum AISource: String, CaseIterable, Identifiable {
         switch self {
         case .antigravity: return "antigravity"
         case .codex:       return "codex"
+        case .deepseek:    return "deepseek"
         }
     }
 }
+
 
 enum TimeRange: String, CaseIterable, Identifiable {
     case today   = "今天"
@@ -73,15 +76,33 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-enum DisplayedSources: String, CaseIterable, Identifiable {
-    case both
+enum DisplayedSources: String, CaseIterable, Identifiable, Codable {
+    case all
     case antigravityOnly
     case codexOnly
+    case deepseekOnly
 
     var id: String { rawValue }
+
+    static func from(rawValue: String) -> DisplayedSources {
+        switch rawValue {
+        case "all", "both", "combined":
+            return .all
+        case "antigravityOnly", "antigravity":
+            return .antigravityOnly
+        case "codexOnly", "codex":
+            return .codexOnly
+        case "deepseekOnly", "deepseek":
+            return .deepseekOnly
+        default:
+            return .all
+        }
+    }
 }
 
+
 // MARK: - TokenDataModel
+
 
 struct ModelFilterOption: Identifiable, Hashable {
     let id: String
@@ -367,6 +388,181 @@ class TokenDataModel: ObservableObject {
     @Published var isScanning  = false
     @Published var scanError: String? = nil
 
+    // ── DeepSeek API State ────────────────────────────────────────────────
+    @Published var deepseekData: DeepSeekDashboardData? = nil
+    @Published var deepseekApiKeyInput: String = ""
+    @Published var isDeepSeekConfigured: Bool = false
+    @Published var deepseekStatusMessage: String? = nil
+    @Published var isDeepSeekImporting: Bool = false
+    @Published var isDeepSeekBalanceLoading: Bool = false
+    @Published var deepseekBalanceError: String? = nil
+    @Published var deepseekSelectedMonth: String = "all" {
+        didSet { UserDefaults.standard.set(deepseekSelectedMonth, forKey: "deepseekSelectedMonth") }
+    }
+
+    func deepSeekUsageViewData() -> DeepSeekUsageViewData? {
+        guard let usage = deepseekData?.usage else { return nil }
+        if deepseekSelectedMonth == "all" || deepseekSelectedMonth.isEmpty {
+            return DeepSeekUsageViewData(usage)
+        }
+        guard let summary = usage.monthlySummaries.first(where: { $0.month == deepseekSelectedMonth }) else {
+            return DeepSeekUsageViewData(usage)
+        }
+        return DeepSeekUsageViewData(summary, currencies: usage.currencies)
+    }
+
+    func deepSeekMonthLabel(_ month: String) -> String {
+        guard month.count == 7, let year = Int(month.prefix(4)), let monthNumber = Int(month.suffix(2)) else {
+            return tr("累计", "All Time")
+        }
+        if language == .chinese { return String(format: "%d年%d月", year, monthNumber) }
+        let names = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+        return monthNumber >= 1 && monthNumber <= 12 ? "\(names[monthNumber]) \(year)" : month
+    }
+
+    func saveDeepSeekApiKey(_ key: String) {
+        let cleanKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanKey.isEmpty else { return }
+        do {
+            try DeepSeekCredentialStore.save(apiKey: cleanKey)
+            isDeepSeekConfigured = true
+            deepseekApiKeyInput = ""
+            deepseekStatusMessage = tr("API Key 已保存至本机私有凭据文件 (0600)，正在获取最新余额...", "API Key saved to private credentials file (0600), fetching balance...")
+            refreshDeepSeekBalance(forcedKey: cleanKey)
+        } catch {
+            deepseekStatusMessage = tr("保存 API Key 失败：\(error.localizedDescription)", "Failed to save API Key: \(error.localizedDescription)")
+        }
+    }
+
+    func deleteDeepSeekApiKey() {
+        try? DeepSeekCredentialStore.delete()
+        isDeepSeekConfigured = false
+        deepseekApiKeyInput = ""
+        deepseekBalanceError = nil
+        deepseekStatusMessage = tr("API Key 凭据已删除", "API Key credential deleted")
+        let unconfigBal = DeepSeekBalanceInfo(
+            configured: false,
+            isAvailable: false,
+            currency: "CNY",
+            totalBalance: "0.00",
+            grantedBalance: "0.00",
+            toppedUpBalance: "0.00",
+            balanceInfos: [],
+            fetchedAt: "",
+            errorCode: "unconfigured",
+            errorMessage: tr("未配置 Key", "Key Not Configured")
+        )
+        if var data = deepseekData {
+            data.balance = unconfigBal
+            deepseekData = data
+        }
+        writeBalanceCache(unconfigBal)
+    }
+
+    func refreshDeepSeekBalance(forcedKey: String? = nil) {
+        let keyToUse: String?
+        if let fk = forcedKey {
+            keyToUse = fk
+        } else {
+            keyToUse = DeepSeekCredentialStore.load()
+        }
+
+        guard let key = keyToUse, !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            isDeepSeekConfigured = false
+            deepseekBalanceError = tr("尚未配置 DeepSeek API Key，请前往设置 > DeepSeek 配置。", "DeepSeek API Key not configured. Please go to Settings > DeepSeek Settings.")
+            isDeepSeekBalanceLoading = false
+            return
+        }
+
+        isDeepSeekConfigured = true
+        isDeepSeekBalanceLoading = true
+        deepseekBalanceError = nil
+
+        DeepSeekBalanceService.shared.fetchBalance(apiKey: key) { [weak self] balanceInfo, errorMsg in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.isDeepSeekBalanceLoading = false
+
+                if let bal = balanceInfo {
+                    self.deepseekBalanceError = nil
+                    self.deepseekStatusMessage = self.tr("余额刷新成功", "Balance refreshed successfully")
+                    if var data = self.deepseekData {
+                        data.balance = bal
+                        self.deepseekData = data
+                    } else {
+                        self.deepseekData = DeepSeekDashboardData(
+                            balance: bal,
+                            usage: DeepSeekUsageInfo(
+                                hasHistory: false, coverageStart: "", coverageEnd: "", lastImportAt: "",
+                                currencies: ["CNY"], totalRequestCount: 0, totalInputTokens: 0,
+                                totalOutputTokens: 0, totalTokens: 0, totalActualAmount: "0.00",
+                                models: [], keys: [], dailySeries: []
+                            )
+                        )
+                    }
+                    self.writeBalanceCache(bal)
+                } else {
+                    let err = errorMsg ?? self.tr("余额刷新失败", "Failed to refresh balance")
+                    self.deepseekBalanceError = err
+                    self.deepseekStatusMessage = self.tr("余额刷新失败：\(err)", "Balance refresh failed: \(err)")
+                }
+            }
+        }
+    }
+
+
+
+
+    private func writeBalanceCache(_ bal: DeepSeekBalanceInfo) {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = appSupport.appendingPathComponent("Antigravity Token Monitor")
+        let fileURL = dir.appendingPathComponent("deepseek_balance_cache.json")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        if let data = try? JSONEncoder().encode(bal) {
+            try? data.write(to: fileURL, options: .atomic)
+            updateDashboardDeepSeekNode(bal)
+        }
+    }
+
+    private func updateDashboardDeepSeekNode(_ bal: DeepSeekBalanceInfo) {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = appSupport.appendingPathComponent("Antigravity Token Monitor")
+        let dashURL = dir.appendingPathComponent("dashboard.json")
+
+        guard let dashData = try? Data(contentsOf: dashURL),
+              var json = try? JSONSerialization.jsonObject(with: dashData) as? [String: Any] else { return }
+
+        var dsNode = (json["deepseek"] as? [String: Any]) ?? [:]
+        if let balData = try? JSONEncoder().encode(bal),
+           let balDict = try? JSONSerialization.jsonObject(with: balData) as? [String: Any] {
+            dsNode["balance"] = balDict
+        }
+        json["deepseek"] = dsNode
+
+        if let updatedData = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted]) {
+            try? updatedData.write(to: dashURL, options: .atomic)
+        }
+    }
+
+    func importDeepSeekZip(at url: URL) {
+        isDeepSeekImporting = true
+        deepseekStatusMessage = tr("正在导入 DeepSeek 用量 ZIP...", "Importing DeepSeek usage ZIP...")
+        ScannerRunner.runDeepSeekImport(zipPath: url.path) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.isDeepSeekImporting = false
+                switch result {
+                case .success:
+                    self.deepseekStatusMessage = self.tr("DeepSeek 用量数据导入成功", "DeepSeek usage imported successfully")
+                    self.loadLocalCache()
+                case .failure(let err):
+                    self.deepseekStatusMessage = self.tr("导入失败：\(err.localizedDescription)", "Import failed: \(err.localizedDescription)")
+                }
+            }
+        }
+    }
+
+
     // ── UI selection state ────────────────────────────────────────────────
     @Published var selectedSource: AISource = .antigravity {
         didSet {
@@ -387,7 +583,7 @@ class TokenDataModel: ObservableObject {
     @Published var menuBarDisplay: MenuBarDisplay = .days7Total {
         didSet { UserDefaults.standard.set(menuBarDisplay.rawValue, forKey: "menuBarDisplay3"); updateMenuBarText(); persistSettingsIfReady() }
     }
-    @Published var displayedSources: DisplayedSources = .both {
+    @Published var displayedSources: DisplayedSources = .all {
         didSet {
             UserDefaults.standard.set(displayedSources.rawValue, forKey: "displayedSources")
             enforceDisplayedSourceSelection()
@@ -395,6 +591,7 @@ class TokenDataModel: ObservableObject {
             persistSettingsIfReady()
         }
     }
+
     @Published var refreshInterval: RefreshInterval = .min5 {
         didSet { UserDefaults.standard.set(refreshInterval.rawValue, forKey: "refreshInterval"); setupTimer(); persistSettingsIfReady() }
     }
@@ -444,23 +641,28 @@ class TokenDataModel: ObservableObject {
 
     func displayedSourcesLabel(_ value: DisplayedSources) -> String {
         switch value {
-        case .both: return tr("Antigravity 与 Codex", "Antigravity & Codex")
+        case .all: return tr("全部", "All")
         case .antigravityOnly: return tr("仅 Antigravity", "Antigravity Only")
         case .codexOnly: return tr("仅 Codex", "Codex Only")
+        case .deepseekOnly: return tr("仅 DeepSeek", "DeepSeek Only")
         }
     }
 
-    var shouldShowSourceSegment: Bool { displayedSources == .both }
+    var shouldShowSourceSegment: Bool { displayedSources == .all }
 
     private func enforceDisplayedSourceSelection() {
         switch displayedSources {
-        case .both: break
+        case .all: break
         case .antigravityOnly:
             if selectedSource != .antigravity { selectedSource = .antigravity }
         case .codexOnly:
             if selectedSource != .codex { selectedSource = .codex }
+        case .deepseekOnly:
+            if selectedSource != .deepseek { selectedSource = .deepseek }
         }
     }
+
+
 
     func refreshIntervalLabel(_ interval: RefreshInterval) -> String {
         interval == .off ? tr("关闭", "Off") : "\(interval.rawValue) \(tr("分钟", interval.rawValue == 1 ? "minute" : "minutes"))"
@@ -723,21 +925,89 @@ class TokenDataModel: ObservableObject {
     // MARK: - Menu bar text
 
     func updateMenuBarText() {
-        let ss = dashboard.sources[selectedSource.jsonKey] ?? SourceStats.empty
-        switch menuBarDisplay {
-        case .iconOnly:   menuBarText = ""
-        case .todayTotal: menuBarText = fmt(ss.today.identifiableTokens)
-        case .days7Total: menuBarText = fmt(ss.last7.identifiableTokens)
-        case .days30Total: menuBarText = fmt(ss.last30.identifiableTokens)
-        case .allTotal:   menuBarText = fmt(ss.allTime.identifiableTokens)
-        case .allCost:
-            menuBarText = "$\(String(format: "%.2f", ss.allTime.estimatedCost))"
+        switch selectedSource {
+        case .antigravity:
+            formatMenuBarForSourceStats(ss: dashboard.sources["antigravity"] ?? .empty, currencySymbol: "$")
+        case .codex:
+            formatMenuBarForSourceStats(ss: dashboard.sources["codex"] ?? .empty, currencySymbol: "$")
+        case .deepseek:
+            formatMenuBarForDeepSeek(ds: dashboard.deepseek)
         }
     }
 
-    // MARK: - Scan
+    private func formatMenuBarForSourceStats(ss: SourceStats, currencySymbol: String) {
+        switch menuBarDisplay {
+        case .iconOnly:    menuBarText = ""
+        case .todayTotal:  menuBarText = fmt(ss.today.identifiableTokens)
+        case .days7Total:  menuBarText = fmt(ss.last7.identifiableTokens)
+        case .days30Total: menuBarText = fmt(ss.last30.identifiableTokens)
+        case .allTotal:    menuBarText = fmt(ss.allTime.identifiableTokens)
+        case .allCost:     menuBarText = "\(currencySymbol)\(String(format: "%.2f", ss.allTime.estimatedCost))"
+        }
+    }
+
+    private func formatMenuBarForDeepSeek(ds: DeepSeekDashboardData?) {
+        let usg = ds?.usage
+        switch menuBarDisplay {
+        case .iconOnly:
+            menuBarText = ""
+        case .todayTotal:
+            // Section 四 Rule 5: 当菜单栏模式要求“今日”数据，但 DeepSeek 导入范围不含今天时，显示 —
+            menuBarText = "—"
+        case .days7Total:
+            menuBarText = deepSeekRangeTokens(usg, days: 7).map(fmt) ?? "—"
+        case .days30Total:
+            menuBarText = deepSeekRangeTokens(usg, days: 30).map(fmt) ?? "—"
+        case .allTotal:
+            menuBarText = (usg?.totalTokens ?? 0) > 0 ? fmt(usg?.totalTokens ?? 0) : "—"
+        case .allCost:
+            if let amtStr = usg?.totalActualAmount, let amt = Double(amtStr), amt > 0 {
+                let curr = usg?.currencies.first ?? "CNY"
+                let sym = (curr == "USD") ? "$" : "¥"
+                menuBarText = "\(sym)\(String(format: "%.2f", amt))"
+            } else {
+                menuBarText = "¥0.00"
+            }
+        }
+    }
+
+    private func deepSeekRangeTokens(_ usage: DeepSeekUsageInfo?, days: Int) -> Int? {
+        guard let usage else { return nil }
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        let today = Date()
+        guard let start = Calendar(identifier: .gregorian).date(byAdding: .day, value: -(days - 1), to: today) else { return nil }
+        let startText = formatter.string(from: start)
+        let endText = formatter.string(from: today)
+        let total = usage.dailySeries.filter { $0.date >= startText && $0.date <= endText }
+            .reduce(0) { $0 + $1.totalTokens }
+        return total > 0 ? total : nil
+    }
+
+
+    // MARK: - Scan & Refresh
+
+    func refreshCurrentSource() {
+        if selectedSource == .deepseek {
+            guard !isScanning else { return }
+            isScanning = true
+            scanError = nil
+            if isDeepSeekConfigured {
+                refreshDeepSeekBalance(forcedKey: nil)
+            }
+            loadLocalCache()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+                self?.isScanning = false
+            }
+        } else {
+            triggerScan()
+        }
+    }
 
     func triggerScan() {
+
         guard !isScanning else { return }
         isScanning = true
         scanError  = nil
@@ -768,7 +1038,16 @@ class TokenDataModel: ObservableObject {
                 return
             }
             self.dashboard = dash
+            self.deepseekData = dash.deepseek
+            if let available = dash.deepseek?.usage.availableMonths,
+               deepseekSelectedMonth != "all",
+               !available.contains(deepseekSelectedMonth) {
+                deepseekSelectedMonth = "all"
+            }
+            self.isDeepSeekConfigured = DeepSeekCredentialStore.isConfigured
             self.normalizeSelectedModelFilter()
+
+
             self.scanError = nil
             self.updateMenuBarText()
 
@@ -868,6 +1147,7 @@ class TokenDataModel: ObservableObject {
            let m = AppTheme(rawValue: v) { theme = m }
         if let v = ud.string(forKey: "language"), let l = AppLanguage(rawValue: v) { language = l }
         if let v = ud.string(forKey: "displayedSources"), let s = DisplayedSources(rawValue: v) { displayedSources = s }
+        if let v = ud.string(forKey: "deepseekSelectedMonth"), !v.isEmpty { deepseekSelectedMonth = v }
         scanOnStartup = ud.bool(forKey: "scanOnStartup")
         launchAtLogin = ud.bool(forKey: "launchAtLogin")
 

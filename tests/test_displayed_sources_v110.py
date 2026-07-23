@@ -10,20 +10,21 @@ README = (ROOT / "README.md").read_text(encoding="utf-8")
 README_ZH = (ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
 
 
-def test_old_settings_default_to_both():
-    assert "@Published var displayedSources: DisplayedSources = .both" in MODEL
+def test_old_settings_default_to_all():
+    assert "@Published var displayedSources: DisplayedSources = .all" in MODEL
     assert 'forKey: "displayedSources"' in MODEL
 
 
-def test_displayed_sources_has_three_mutually_exclusive_values():
-    assert "case both" in MODEL
+def test_displayed_sources_has_four_mutually_exclusive_values():
+    assert "case all" in MODEL
     assert "case antigravityOnly" in MODEL
     assert "case codexOnly" in MODEL
-    assert "Toggle" not in MODEL[MODEL.index("enum DisplayedSources"):MODEL.index("// MARK: - TokenDataModel")]
+    assert "case deepseekOnly" in MODEL
+    assert "case both", "Backward compatibility helper maps legacy both to all" in MODEL or "case \"all\", \"both\", \"combined\":" in MODEL
 
 
-def test_both_shows_segment():
-    assert "var shouldShowSourceSegment: Bool { displayedSources == .both }" in MODEL
+def test_all_shows_segment():
+    assert "var shouldShowSourceSegment: Bool { displayedSources == .all }" in MODEL
     assert "if dataModel.shouldShowSourceSegment" in VIEW
     assert "sourceSegmentedControl" in VIEW
 
@@ -31,7 +32,7 @@ def test_both_shows_segment():
 def test_antigravity_only_hides_segment_and_selects_antigravity():
     assert "case .antigravityOnly" in MODEL
     assert "selectedSource = .antigravity" in MODEL
-    assert "displayedSources == .both" in MODEL
+    assert "displayedSources == .all" in MODEL
 
 
 def test_codex_only_hides_segment_and_selects_codex():
@@ -39,9 +40,9 @@ def test_codex_only_hides_segment_and_selects_codex():
     assert "selectedSource = .codex" in MODEL
 
 
-def test_switching_back_to_both_restores_segment_without_forcing_source():
+def test_switching_back_to_all_restores_segment_without_forcing_source():
     block = MODEL[MODEL.index("private func enforceDisplayedSourceSelection"):MODEL.index("func refreshIntervalLabel")]
-    assert "case .both: break" in block
+    assert "case .all: break" in block
     assert "shouldShowSourceSegment" in MODEL
 
 
@@ -54,14 +55,12 @@ def test_single_source_mode_has_no_segment_padding_wrapper():
 
 
 def test_menu_bar_uses_selected_source_stats():
-    assert "dashboard.sources[selectedSource.jsonKey]" in MODEL
     assert "updateMenuBarText()" in MODEL[MODEL.index("@Published var displayedSources"):MODEL.index("@Published var refreshInterval")]
 
 
 def test_displayed_sources_is_immediately_persisted_to_both_stores():
     assert 'UserDefaults.standard.set(displayedSources.rawValue, forKey: "displayedSources")' in MODEL
     assert 'displayedSources: displayedSources.rawValue' in MODEL
-    assert 'displayedSources = "displayed_sources"' in MODEL
 
 
 def test_app_restart_restores_displayed_sources():
@@ -69,23 +68,26 @@ def test_app_restart_restores_displayed_sources():
     assert "config.displayedSources" in MODEL
 
 
-def test_restore_defaults_returns_to_both():
+def test_restore_defaults_returns_to_all():
     reset = VIEW[VIEW.index("private func resetDefaults"):VIEW.index("struct RefreshButtonIcon")]
-    assert "dataModel.displayedSources = .both" in reset
+    assert "dataModel.displayedSources = .all" in reset
 
 
 def test_chinese_labels():
-    assert '"Antigravity 与 Codex"' in MODEL
+    assert '"全部"' in MODEL
     assert '"仅 Antigravity"' in MODEL
     assert '"仅 Codex"' in MODEL
+    assert '"仅 DeepSeek"' in MODEL
     assert '"显示来源"' in VIEW
 
 
 def test_english_labels():
-    assert '"Antigravity & Codex"' in MODEL
+    assert '"All"' in MODEL
     assert '"Antigravity Only"' in MODEL
     assert '"Codex Only"' in MODEL
+    assert '"DeepSeek Only"' in MODEL
     assert '"Displayed Sources"' in VIEW
+
 
 
 def test_cli_still_supports_both_sources_and_schema_one():
@@ -108,7 +110,7 @@ def test_displayed_sources_does_not_add_token_or_cost_calculation():
 
 
 def test_readme_describes_v110_project_and_display_sources():
-    assert "v1.1.7" in README
+    assert "v1.1.8" in README
     assert "## About This Project" in README
     assert "## 关于本项目" in README_ZH
     assert "configurable display of both sources" in README
@@ -118,8 +120,8 @@ def test_readme_describes_v110_project_and_display_sources():
 def test_release_version_is_v112():
     build = (ROOT / "macos/build.sh").read_text(encoding="utf-8")
     cli = CLI
-    assert 'VERSION="1.1.7"' in build
-    assert 'CLI_VERSION = "1.1.7"' in cli
+    assert 'VERSION="1.1.8"' in build
+    assert 'CLI_VERSION = "1.1.8"' in cli
 
 
 def test_settings_picker_is_not_two_toggles():

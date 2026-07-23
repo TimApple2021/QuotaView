@@ -54,8 +54,8 @@ class TestLightTheme(unittest.TestCase):
         self.assertIn("palette.primaryText", MENU)
 
     def test_price_labels_are_themeable(self):
-        self.assertIn('dataModel.tr("输入:", "Input:")', MENU)
-        self.assertIn('dataModel.tr("输出:", "Output:")', MENU)
+        self.assertIn('dataModel.tr("输入", "Input")', MENU)
+        self.assertIn('dataModel.tr("输出", "Output")', MENU)
 
     def test_price_inputs_use_themeable_surface_and_text(self):
         self.assertIn(".background(palette.inputBackground)", MENU)

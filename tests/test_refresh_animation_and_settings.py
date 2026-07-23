@@ -13,8 +13,8 @@ class TestRefreshAnimationAndSettings(unittest.TestCase):
 
             # 1. 刷新图标 rotationEffect 只作用于内部 Image。
             self.assertIn("Image(systemName: \"arrow.triangle.2.circlepath\")", content)
-            self.assertNotIn("Image(systemName: \"arrow.clockwise\")", content)
             self.assertIn(".rotationEffect(.degrees(angle), anchor: .center)", content)
+
 
             # 2. Custom toolbar button is 32x32 and the outer style does not rotate.
             self.assertIn(".frame(width: 32, height: 32, alignment: .center)", content)

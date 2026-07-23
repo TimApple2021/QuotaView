@@ -77,4 +77,50 @@ class ScannerRunner {
             }
         }
     }
+
+    static var cliURL: URL? {
+        Bundle.main.url(forResource: "quotaview_cli", withExtension: "py")
+            ?? Bundle.main.resourceURL?.appendingPathComponent("quotaview_cli.py")
+    }
+
+    static func runDeepSeekImport(zipPath: String, completion: @escaping (Result<String, Error>) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard let cliURL = cliURL else {
+                completion(.failure(NSError(domain: "ScannerRunner", code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "App 资源中缺少 quotaview_cli.py"])))
+                return
+            }
+            let process = Process()
+            let pipe = Pipe()
+            let errorPipe = Pipe()
+
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            process.arguments = ["python3", cliURL.path, "deepseek", "import", zipPath, "--json"]
+            process.environment = ProcessInfo.processInfo.environment.merging([
+                "TOKEN_MONITOR_DATA_DIR": TokenRuntimePaths.appSupportDirectory.path
+            ]) { _, new in new }
+            process.standardOutput = pipe
+            process.standardError = errorPipe
+
+            do {
+                try process.run()
+                process.waitUntilExit()
+
+                let status = process.terminationStatus
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                let output = String(data: data, encoding: .utf8) ?? ""
+
+                if status == 0 {
+                    completion(.success(output))
+                } else {
+                    let errData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+                    let errOutput = String(data: errData, encoding: .utf8) ?? ""
+                    let msg = errOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+                    completion(.failure(NSError(domain: "ScannerRunner", code: Int(status), userInfo: [NSLocalizedDescriptionKey: msg.isEmpty ? "导入失败" : msg])))
+                }
+            } catch {
+                completion(.failure(error))
+            }
+        }
+    }
 }

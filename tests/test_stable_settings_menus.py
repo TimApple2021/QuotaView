@@ -87,8 +87,9 @@ def test_widths_are_content_specific_and_source_is_wide_enough():
     assert "width: 128" in VIEW
     assert "width: 138" in VIEW
     assert "width: 110" in VIEW
-    assert "Antigravity 与 Codex" in MODEL
-    assert "Antigravity & Codex" in MODEL
+    assert "全部" in MODEL
+    assert "All" in MODEL
+
 
 
 def test_existing_persistence_and_side_effect_bindings_are_unchanged():

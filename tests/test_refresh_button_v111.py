@@ -24,8 +24,9 @@ def test_refresh_button_has_transparent_click_target_only():
 
 def test_refresh_button_uses_double_arrow_cycle_symbol():
     assert 'Image(systemName: "arrow.triangle.2.circlepath")' in icon_block()
-    assert 'Image(systemName: "arrow.clockwise")' not in VIEW
+    assert 'Image(systemName: "arrow.clockwise")' not in icon_block()
     assert "arrow.clockwise.circle" not in VIEW
+
 
 
 def test_refresh_button_is_32_by_32():
@@ -55,7 +56,7 @@ def test_scan_rotation_still_resets_to_zero():
 
 def test_scanning_disables_repeat_trigger():
     assert ".disabled(dataModel.isScanning)" in VIEW
-    assert "dataModel.triggerScan()" in VIEW
+    assert "dataModel.refreshCurrentSource()" in VIEW
 
 
 def test_existing_scan_lock_remains_unchanged():
@@ -65,14 +66,14 @@ def test_existing_scan_lock_remains_unchanged():
 
 
 def test_refresh_button_keeps_left_footer_and_settings_button():
-    footer = VIEW[VIEW.index("// Footer"):VIEW.index("private var settingsPage")]
-    assert "dataModel.triggerScan()" in footer
+    footer = VIEW[VIEW.index("// Footer"):VIEW.index("private func barWidth")]
+    assert "dataModel.refreshCurrentSource()" in footer
     assert 'Image(systemName: "gearshape")' in footer
     assert ".frame(width: 32, height: 32" in footer
 
 
 def test_settings_gear_is_visually_balanced_without_changing_refresh():
-    footer = VIEW[VIEW.index("// Footer"):VIEW.index("private var settingsPage")]
+    footer = VIEW[VIEW.index("// Footer"):VIEW.index("private func barWidth")]
     assert '.font(.system(size: 20, weight: .medium))' in footer
     assert '.frame(width: 32, height: 32, alignment: .center)' in footer
     assert 'Image(systemName: "arrow.triangle.2.circlepath")' in VIEW
@@ -93,9 +94,10 @@ def test_accessibility_labels_are_bilingual():
 
 
 def test_refresh_button_is_a_button_for_voiceover():
-    footer = VIEW[VIEW.index("// Footer"):VIEW.index("private var settingsPage")]
-    assert "Button { dataModel.triggerScan() }" in footer
+    footer = VIEW[VIEW.index("// Footer"):VIEW.index("private func barWidth")]
+    assert "Button { dataModel.refreshCurrentSource() }" in footer
     assert ".accessibilityLabel(dataModel.isScanning" in footer
+
 
 
 def test_token_cost_quota_reset_and_cli_contracts_are_not_in_button_style():
