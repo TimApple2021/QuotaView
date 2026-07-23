@@ -33,6 +33,7 @@ cp "$PROJECT_DIR/branding/QuotaView/menu-bar/QuotaViewHeader-18@2x.png" "$RES_DI
 
 echo "=== 4. 编译 QuotaView Swift 源代码 ==="
 swiftc -parse-as-library \
+    -target arm64-apple-macos13.0 \
     -o "$BIN_DIR/$EXECUTABLE_NAME" \
     "$MACOS_DIR/AntigravityTokenMonitor"/*.swift
 
@@ -66,7 +67,39 @@ cat << EOF > "$APP_BUNDLE/Contents/Info.plist"
 </plist>
 EOF
 
-echo "=== 6. 安装 QuotaView 到 Applications ==="
+echo "=== 6. 对完整 App Bundle 进行 ad-hoc 签名并验证 ==="
+codesign \
+    --force \
+    --deep \
+    --sign - \
+    --timestamp=none \
+    "$APP_BUNDLE"
+
+codesign \
+    --verify \
+    --deep \
+    --strict \
+    --verbose=2 \
+    "$APP_BUNDLE"
+
+ARCHS="$(lipo -archs "$BIN_DIR/$EXECUTABLE_NAME")"
+test "$ARCHS" = "arm64"
+
+BUILT_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_BUNDLE/Contents/Info.plist")"
+BUILT_NUMBER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP_BUNDLE/Contents/Info.plist")"
+BUILT_MINIMUM="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$APP_BUNDLE/Contents/Info.plist")"
+test "$BUILT_VERSION" = "$VERSION"
+test "$BUILT_NUMBER" = "118"
+test "$BUILT_MINIMUM" = "13.0"
+
+if command -v vtool >/dev/null 2>&1; then
+    vtool -show-build "$BIN_DIR/$EXECUTABLE_NAME" | grep -q 'minos 13.0'
+else
+    otool -l "$BIN_DIR/$EXECUTABLE_NAME" \
+        | awk '/LC_BUILD_VERSION/{found=1} found && /minos 13\.0/{ok=1} found && /sdk/{exit ok ? 0 : 1}'
+fi
+
+echo "=== 7. 安装 QuotaView 到 Applications ==="
 GLOBAL_DEST="/Applications/$APP_NAME.app"
 USER_DEST="$HOME/Applications/$APP_NAME.app"
 
@@ -82,7 +115,7 @@ else
     echo "应用成功安装到用户 Applications 目录: $USER_DEST"
 fi
 
-echo "=== 7. 安装全局 quotaview 命令入口 ==="
+echo "=== 8. 安装全局 quotaview 命令入口 ==="
 INSTALLED_APP="$GLOBAL_DEST"
 if [ ! -d "$INSTALLED_APP" ]; then
     INSTALLED_APP="$USER_DEST"
@@ -99,4 +132,4 @@ fi
 ln -sf "$CLI_TARGET" "$GLOBAL_BIN/quotaview"
 echo "全局命令已安装: $GLOBAL_BIN/quotaview"
 
-echo "=== 8. QuotaView 构建与安装完成！ ==="
+echo "=== 9. QuotaView 构建与安装完成！ ==="

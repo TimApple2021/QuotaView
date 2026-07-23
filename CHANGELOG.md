@@ -22,6 +22,7 @@
 - Historical model ID parsing off the SwiftUI main thread.
 - Atomic Codex scan-cache writes and backup recovery.
 - Stable settings menus and complete source labels.
+- Release builds now explicitly target Apple Silicon and macOS 13.0, with the completed app bundle ad-hoc signed and verified before installation.
 
 ### Security / Privacy
 
@@ -45,6 +46,7 @@
 
 - 将历史模型 ID 解析移至 Swift Utility 后台队列；使用 generation 计数器防止旧的异步结果覆盖新刷新结果。
 - 为 Codex 扫描缓存添加原子写入、fsync 和 `.bak` 备份恢复；缓存损坏不再影响主账本。
+- 发布构建现在明确面向 Apple Silicon 和 macOS 13.0，并在安装前对完整 App Bundle 进行 ad-hoc 签名和验证。
 - 统一菜单栏"累计费用"格式：Antigravity 和 Codex 均显示 `$X.XX`（删除 Codex 的 `C` 后缀）。
 - 将设置页六个 `.pickerStyle(.menu)` 选择器替换为可复用的 `StableSettingsMenu`，从固定锚点弹出菜单，避免在屏幕顶部附近时系统重新定位。
 - 从 `macos/build.sh` 删除 `runtime_migration.py` 的自动调用；迁移工具现在要求显式提供 `--source` 和 `--target`，使用项目 `data/` 目录时给出警告。
